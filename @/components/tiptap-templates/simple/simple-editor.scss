@@ -26,9 +26,7 @@ body,
   background-color: var(--tt-bg-color);
 }
 
-body {
-  overflow: hidden;
-}
+/* Removed global body overflow hidden to allow proper scrolling */
 
 .tiptap.ProseMirror {
   font-family: "DM Sans", sans-serif;

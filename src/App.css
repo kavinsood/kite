@@ -43,3 +43,29 @@
 .read-the-docs {
 	color: #888;
 }
+
+/* Full app container with no gaps */
+.app-container {
+	height: 100vh;
+	width: 100vw;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	background-color: var(--tt-bg-color, #ffffff);
+	color: var(--tt-theme-text, #000000);
+}
+
+/* Ensure the root and body are full height with no margins */
+html, body, #root {
+	height: 100%;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+/* Dark mode support */
+.dark .app-container {
+	background-color: var(--tt-bg-color);
+	color: var(--tt-theme-text);
+}

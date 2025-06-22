@@ -197,6 +197,8 @@ export function SimpleEditor() {
         autocapitalize: "off",
         "aria-label": "Main content area, start typing to enter text.",
       },
+      scrollThreshold: 80,
+      scrollMargin: 80,
     },
     extensions: [
       StarterKit,
