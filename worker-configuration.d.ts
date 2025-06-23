@@ -3,6 +3,9 @@
 // Runtime types generated with workerd@1.20250617.0 2025-06-20 
 declare namespace Cloudflare {
 	interface Env {
+		ASSETS: {
+			fetch: typeof fetch;
+		};
 	}
 }
 interface Env extends Cloudflare.Env {}
