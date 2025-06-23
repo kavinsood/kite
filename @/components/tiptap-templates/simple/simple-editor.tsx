@@ -6,12 +6,12 @@ import { StarterKit } from "@tiptap/starter-kit"
 import { Image } from "@tiptap/extension-image"
 import { TaskItem } from "@tiptap/extension-task-item"
 import { TaskList } from "@tiptap/extension-task-list"
-import { TextAlign } from "@tiptap/extension-text-align"
 import { Typography } from "@tiptap/extension-typography"
 import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
+import { TextAlign } from "@tiptap/extension-text-align"
 import { Markdown } from "tiptap-markdown"
 import { Placeholder } from "@tiptap/extension-placeholder"
 
@@ -28,6 +28,7 @@ import {
 import { Link } from "@/components/tiptap-extension/link-extension"
 import { Selection } from "@/components/tiptap-extension/selection-extension"
 import { TrailingNode } from "@/components/tiptap-extension/trailing-node-extension"
+import { KeyboardShortcuts } from "@/components/tiptap-extension/keyboard-shortcuts-extension"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
@@ -62,7 +63,6 @@ import {
   LinkButton,
 } from "@/components/tiptap-ui/link-popover"
 import { MarkButton } from "@/components/tiptap-ui/mark-button"
-import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 
 // --- Icons ---
@@ -207,15 +207,6 @@ const MainToolbarContent = ({
       <ToolbarSeparator />
 
       <ToolbarGroup>
-        <TextAlignButton align="left" />
-        <TextAlignButton align="center" />
-        <TextAlignButton align="right" />
-        <TextAlignButton align="justify" />
-      </ToolbarGroup>
-
-      <ToolbarSeparator />
-
-      <ToolbarGroup>
         <ImageUploadButton text="Add" />
         <ThemeToggle />
       </ToolbarGroup>
@@ -292,10 +283,6 @@ export function SimpleEditor() {
           }
         }
       }),
-      TextAlign.configure({ 
-        types: ["heading", "paragraph", "listItem"],
-        defaultAlignment: "left"
-      }),
       Underline,
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -336,6 +323,10 @@ export function SimpleEditor() {
         transformPastedText: true,   // Allow to paste markdown text in the editor
         transformCopiedText: false,  // Copied text is transformed to markdown
       }),
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
+      KeyboardShortcuts,
     ],
     content: {
       type: "doc",

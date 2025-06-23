@@ -78,7 +78,8 @@
     background-color: var(--tt-toolbar-bg-color);
     box-shadow: var(--tt-shadow-elevated-md);
     outline: none;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
 
     &[data-plain="true"] {
       padding: 0;
