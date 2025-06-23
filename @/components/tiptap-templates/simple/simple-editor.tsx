@@ -12,6 +12,7 @@ import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
+import { Markdown } from "tiptap-markdown"
 
 // --- Custom Extensions ---
 import { Link } from "@/components/tiptap-extension/link-extension"
@@ -63,6 +64,8 @@ import { LinkIcon } from "@/components/tiptap-icons/link-icon"
 import { useMobile } from "@/hooks/use-mobile"
 import { useWindowSize } from "@/hooks/use-window-size"
 import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
+import { useEditorPersistence } from "@/hooks/use-editor-persistence"
+import { useFocusMode } from "@/hooks/use-focus-mode"
 
 // --- Components ---
 import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
@@ -73,7 +76,7 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
-import content from "@/components/tiptap-templates/simple/data/content.json"
+
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -138,15 +141,14 @@ const MainToolbarContent = ({
 
       <ToolbarGroup>
         <ImageUploadButton text="Add" />
+        <ThemeToggle />
       </ToolbarGroup>
+
+      <ToolbarSeparator />
 
       <Spacer />
 
       {isMobile && <ToolbarSeparator />}
-
-      <ToolbarGroup>
-        <ThemeToggle />
-      </ToolbarGroup>
 
 
     </>
@@ -192,6 +194,7 @@ export function SimpleEditor() {
 
   const editor = useEditor({
     immediatelyRender: false,
+    autofocus: true,
     editorProps: {
       attributes: {
         autocomplete: "off",
@@ -203,8 +206,17 @@ export function SimpleEditor() {
       scrollMargin: 80,
     },
     extensions: [
-      StarterKit,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      StarterKit.configure({
+        paragraph: {
+          HTMLAttributes: {
+            style: "text-align: left;"
+          }
+        }
+      }),
+      TextAlign.configure({ 
+        types: ["heading", "paragraph", "listItem"],
+        defaultAlignment: "left"
+      }),
       Underline,
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -222,11 +234,50 @@ export function SimpleEditor() {
         upload: handleImageUpload,
         onError: (error) => console.error("Upload failed:", error),
       }),
-      TrailingNode,
+      TrailingNode.configure({
+        node: "paragraph",
+        notAfter: ["paragraph"],
+      }),
       Link.configure({ openOnClick: false }),
+      Markdown.configure({
+        html: true,                  // Allow HTML input/output
+        tightLists: true,            // No <p> inside <li> in markdown output
+        tightListClass: 'tight',     // Add class to <ul> allowing you to remove <p> margins when tight
+        bulletListMarker: '-',       // <li> prefix in markdown output
+        linkify: false,              // Create links from "https://..." text
+        breaks: false,               // New lines (\n) in markdown input are converted to <br>
+        transformPastedText: true,   // Allow to paste markdown text in the editor
+        transformCopiedText: false,  // Copied text is transformed to markdown
+      }),
     ],
-    content: content,
+    content: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          attrs: { textAlign: "left" },
+          content: []
+        }
+      ]
+    },
   })
+
+  // Initialize localStorage persistence with autosave (no manual UI)
+  // We ignore the returned state/actions because autosave is enabled by default
+  useEditorPersistence(editor, {
+    storageKey: "simple-editor-content",
+    debounceMs: 1000,
+    autoSave: true,
+  })
+
+  // Initialize focus mode for distraction-free writing
+  const focusMode = useFocusMode({
+    editor,
+    enterFocusDelay: 100,
+    exitFocusDelay: 3000,
+    enabled: true,
+  })
+  const { isFocusMode, isTyping } = focusMode
 
   const bodyRect = useCursorVisibility({
     editor,
@@ -239,38 +290,51 @@ export function SimpleEditor() {
     }
   }, [isMobile, mobileView])
 
+  // Build CSS classes for focus mode
+  const editorClasses = [
+    isFocusMode && !isMobile ? 'simple-editor-focus-mode' : '',
+    isTyping ? 'simple-editor-typing' : '',
+  ].filter(Boolean).join(' ')
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('Focus mode state:', { isFocusMode, isTyping, isMobile, editorClasses })
+  }, [isFocusMode, isTyping, isMobile, editorClasses])
+
   return (
     <EditorContext.Provider value={{ editor }}>
-      <Toolbar
-        ref={toolbarRef}
-        style={
-          isMobile
-            ? {
-                bottom: `calc(100% - ${windowSize.height - bodyRect.y}px)`,
-              }
-            : {}
-        }
-      >
-        {mobileView === "main" ? (
-          <MainToolbarContent
-            onHighlighterClick={() => setMobileView("highlighter")}
-            onLinkClick={() => setMobileView("link")}
-            isMobile={isMobile}
-          />
-        ) : (
-          <MobileToolbarContent
-            type={mobileView === "highlighter" ? "highlighter" : "link"}
-            onBack={() => setMobileView("main")}
-          />
-        )}
-      </Toolbar>
+      <div className={editorClasses}>
+        <Toolbar
+          ref={toolbarRef}
+          style={
+            isMobile
+              ? {
+                  bottom: `calc(100% - ${windowSize.height - bodyRect.y}px)`,
+                }
+              : {}
+          }
+        >
+          {mobileView === "main" ? (
+            <MainToolbarContent
+              onHighlighterClick={() => setMobileView("highlighter")}
+              onLinkClick={() => setMobileView("link")}
+              isMobile={isMobile}
+            />
+          ) : (
+            <MobileToolbarContent
+              type={mobileView === "highlighter" ? "highlighter" : "link"}
+              onBack={() => setMobileView("main")}
+            />
+          )}
+        </Toolbar>
 
-      <div className="content-wrapper">
-        <EditorContent
-          editor={editor}
-          role="presentation"
-          className="simple-editor-content"
-        />
+        <div className="content-wrapper">
+          <EditorContent
+            editor={editor}
+            role="presentation"
+            className="simple-editor-content"
+          />
+        </div>
       </div>
     </EditorContext.Provider>
   )

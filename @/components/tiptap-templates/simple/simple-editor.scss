@@ -61,12 +61,63 @@ body,
   margin: 0 auto;
 }
 
+.simple-editor-header {
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0.75rem 3rem 0;
+  border-bottom: 1px solid var(--tt-separator-color);
+  background-color: var(--tt-bg-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 .simple-editor-content .tiptap.ProseMirror {
   padding: 3rem 3rem;
 }
 
 @media screen and (max-width: 480px) {
+  .simple-editor-header {
+    padding: 0.75rem 1.5rem 0;
+  }
+
   .simple-editor-content .tiptap.ProseMirror {
     padding: 1rem 1.5rem;
+  }
+}
+
+/* Focus Mode Styles - No layout shifts, just elegant fading */
+.simple-editor-focus-mode {
+  .tiptap-toolbar {
+    opacity: 0;
+    pointer-events: none;
+    /* Longer fade (900ms) for smoother disappearance */
+    transition: opacity 900ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Show toolbar at full opacity when the user moves the mouse */
+  &:hover .tiptap-toolbar {
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 140ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Ensure toolbar works properly in mobile view - focus mode disabled there */
+@media screen and (max-width: 768px) {
+  .simple-editor-focus-mode {
+    .tiptap-toolbar {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+}
+
+/* Typing override: always hide toolbar while actively typing */
+.simple-editor-focus-mode.simple-editor-typing {
+  .tiptap-toolbar {
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 }

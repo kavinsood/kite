@@ -4,7 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e11" media="(prefers-color-scheme: dark)" />
     <title>Vite + React + TS</title>
+    
+    <script>
+      // Prevent white flash by applying dark mode immediately
+      (function() {
+        // Check for saved theme preference or default to system preference
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const shouldUseDark = savedTheme === 'dark' || (!savedTheme && prefersDark);
+        
+        if (shouldUseDark) {
+          document.documentElement.classList.add('dark');
+          document.body.classList.add('dark');
+        }
+        
+        // Set initial background color to prevent flash
+        document.documentElement.style.backgroundColor = shouldUseDark ? '#0e0e11' : '#ffffff';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

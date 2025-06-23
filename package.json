@@ -13,6 +13,7 @@
 	},
 	"dependencies": {
 		"@floating-ui/react": "^0.27.12",
+		"@syfxlin/tiptap-starter-kit": "^1.1.2",
 		"@tiptap/extension-highlight": "^2.22.3",
 		"@tiptap/extension-image": "^2.22.3",
 		"@tiptap/extension-link": "^2.22.3",
@@ -27,7 +28,8 @@
 		"@tiptap/react": "^2.22.3",
 		"@tiptap/starter-kit": "^2.22.3",
 		"react": "^19.1.0",
-		"react-dom": "^19.1.0"
+		"react-dom": "^19.1.0",
+		"tiptap-markdown": "^0.8.10"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.7.4",
