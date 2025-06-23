@@ -72,8 +72,8 @@ export function useFocusMode({
   const [isTyping, setIsTyping] = React.useState(false)
   const [manualFocusMode, setManualFocusMode] = React.useState<boolean | null>(null)
   
-  const enterTimeoutRef = React.useRef<NodeJS.Timeout | undefined>()
-  const exitTimeoutRef = React.useRef<NodeJS.Timeout | undefined>()
+  const enterTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined)
+  const exitTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined)
   const lastActivityRef = React.useRef<number>(0)
 
   // Clear timeouts helper
@@ -103,7 +103,7 @@ export function useFocusMode({
       return
     }
 
-    const handleUpdate = ({ editor: updatedEditor }: { editor: any }) => {
+    const handleUpdate = () => {
       console.log('Editor update detected!') // Debug log
       
       const now = Date.now()

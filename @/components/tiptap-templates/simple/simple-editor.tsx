@@ -13,6 +13,16 @@ import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
 import { Markdown } from "tiptap-markdown"
+import { Placeholder } from "@tiptap/extension-placeholder"
+
+// --- Slash Commands ---
+import {
+  Slash,
+  SlashCmd,
+  SlashCmdProvider,
+  createSuggestionsItems,
+  enableKeyboardNavigation,
+} from "@harshtalks/slash-tiptap"
 
 // --- Custom Extensions ---
 import { Link } from "@/components/tiptap-extension/link-extension"
@@ -76,7 +86,73 @@ import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
 
-
+// --- Slash Commands Configuration ---
+const slashCommands = createSuggestionsItems([
+  {
+    title: "Heading 1",
+    searchTerms: ["h1", "heading", "title"],
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .setNode("heading", { level: 1 })
+        .run()
+    },
+  },
+  {
+    title: "Heading 2",
+    searchTerms: ["h2", "heading", "subtitle"],
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .setNode("heading", { level: 2 })
+        .run()
+    },
+  },
+  {
+    title: "Heading 3",
+    searchTerms: ["h3", "heading"],
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .setNode("heading", { level: 3 })
+        .run()
+    },
+  },
+  {
+    title: "Bullet List",
+    searchTerms: ["ul", "unordered", "bullet", "list"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleBulletList().run()
+    },
+  },
+  {
+    title: "Ordered List",
+    searchTerms: ["ol", "ordered", "numbered", "list"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleOrderedList().run()
+    },
+  },
+  {
+    title: "Task List",
+    searchTerms: ["todo", "task", "checklist", "checkbox"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleTaskList().run()
+    },
+  },
+  {
+    title: "Quote",
+    searchTerms: ["blockquote", "quote", "citation"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleBlockquote().run()
+    },
+  },
+])
 
 const MainToolbarContent = ({
   onHighlighterClick,
@@ -204,6 +280,9 @@ export function SimpleEditor() {
       },
       scrollThreshold: 80,
       scrollMargin: 80,
+      handleDOMEvents: {
+        keydown: (_, event) => enableKeyboardNavigation(event),
+      },
     },
     extensions: [
       StarterKit.configure({
@@ -225,7 +304,15 @@ export function SimpleEditor() {
       Typography,
       Superscript,
       Subscript,
-
+      Placeholder.configure({
+        placeholder: "Type / to insert a command...",
+        showOnlyCurrent: true,
+      }),
+      Slash.configure({
+        suggestion: {
+          items: () => slashCommands,
+        },
+      }),
       Selection,
       ImageUploadNode.configure({
         accept: "image/*",
@@ -303,39 +390,59 @@ export function SimpleEditor() {
 
   return (
     <EditorContext.Provider value={{ editor }}>
-      <div className={editorClasses}>
-        <Toolbar
-          ref={toolbarRef}
-          style={
-            isMobile
-              ? {
-                  bottom: `calc(100% - ${windowSize.height - bodyRect.y}px)`,
-                }
-              : {}
-          }
-        >
-          {mobileView === "main" ? (
-            <MainToolbarContent
-              onHighlighterClick={() => setMobileView("highlighter")}
-              onLinkClick={() => setMobileView("link")}
-              isMobile={isMobile}
-            />
-          ) : (
-            <MobileToolbarContent
-              type={mobileView === "highlighter" ? "highlighter" : "link"}
-              onBack={() => setMobileView("main")}
-            />
-          )}
-        </Toolbar>
+      <SlashCmdProvider>
+        <div className={editorClasses}>
+          <Toolbar
+            ref={toolbarRef}
+            style={
+              isMobile
+                ? {
+                    bottom: `calc(100% - ${windowSize.height - bodyRect.y}px)`,
+                  }
+                : {}
+            }
+          >
+            {mobileView === "main" ? (
+              <MainToolbarContent
+                onHighlighterClick={() => setMobileView("highlighter")}
+                onLinkClick={() => setMobileView("link")}
+                isMobile={isMobile}
+              />
+            ) : (
+              <MobileToolbarContent
+                type={mobileView === "highlighter" ? "highlighter" : "link"}
+                onBack={() => setMobileView("main")}
+              />
+            )}
+          </Toolbar>
 
-        <div className="content-wrapper">
-          <EditorContent
-            editor={editor}
-            role="presentation"
-            className="simple-editor-content"
-          />
+          <div className="content-wrapper">
+            <EditorContent
+              editor={editor}
+              role="presentation"
+              className="simple-editor-content"
+            />
+            <div className="tiptap-slash-menu"><SlashCmd.Root editor={editor}>
+              <SlashCmd.Cmd>
+                <SlashCmd.Empty>No commands available</SlashCmd.Empty>
+                <SlashCmd.List>
+                  {slashCommands.map((item) => (
+                    <SlashCmd.Item
+                      key={item.title}
+                      value={item.title}
+                      onCommand={(val) => {
+                        item.command(val)
+                      }}
+                    >
+                      <p>{item.title}</p>
+                    </SlashCmd.Item>
+                  ))}
+                </SlashCmd.List>
+              </SlashCmd.Cmd>
+            </SlashCmd.Root></div>
+          </div>
         </div>
-      </div>
+      </SlashCmdProvider>
     </EditorContext.Provider>
   )
 }
