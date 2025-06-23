@@ -12,6 +12,9 @@
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application"
 	},
+	"build": {
+		"command": "npm run build"
+	},
 	"observability": {
 		"enabled": true
 	}
