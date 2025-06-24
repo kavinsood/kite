@@ -111,7 +111,6 @@ kite/
 #### Special Components
 - **ColorHighlightPopover**: Text highlighting with color picker
 - **LinkPopover**: Link insertion/editing interface
-- **ImageUploadButton**: File upload handling
 
 - **UndoRedoButton**: History navigation
 
@@ -121,14 +120,24 @@ kite/
 
 ### 4. TipTap Nodes (`@/components/tiptap-node/`)
 
-#### Image Upload Node (`image-upload-node/`)
-- **Extension**: `image-upload-node-extension.ts`
-- **Component**: `image-upload-node.tsx`
+#### Custom Image Node (`image-node/`)
+- **Component**: `image-node.tsx` - React component with loading and error states
+- **Extension**: `image-node-extension.ts` - Custom TipTap extension
 - **Features**:
-  - Drag & drop support
-  - Progress tracking
-  - File size validation (5MB limit)
-  - Abort capability
+  - Loading spinner while images load
+  - Error handling with user-friendly error messages
+  - Better keyboard navigation (Enter/Arrow keys)
+  - Automatic paragraph insertion after images
+  - No selection issues when clicking near images
+
+#### Auto Image Extension (`auto-image-extension.ts`)
+- **Purpose**: Automatically converts image URLs to image nodes with enhanced UX
+- **Features**:
+  - Paste URL detection for common image formats (png, jpg, gif, webp, etc.)
+  - Instant image rendering from URLs with loading states
+  - No local storage consumption
+  - Supports query parameters in URLs
+  - Works seamlessly with custom Image Node component
 
 #### Other Nodes
 - **Code Block**: Syntax-highlighted code blocks
@@ -237,11 +246,7 @@ isEmptyNode(node?: Node): boolean
 findNodePosition({ editor, node?, nodePos? }): { pos: number; node: Node } | null
 ```
 
-#### Image Upload
-```typescript
-handleImageUpload(file: File, onProgress?, abortSignal?): Promise<string>
-convertFileToBase64(file: File, abortSignal?): Promise<string>
-```
+
 
 #### CSS Utilities
 ```typescript
@@ -305,7 +310,7 @@ cn(...classes): string  // Conditional class names
 - **Headings**: H1-H6 with dropdown selection
 - **Lists**: Bullet, ordered, task lists
 - **Blocks**: Blockquotes, code blocks
-- **Media**: Image upload with progress tracking
+- **Media**: URL-based image rendering (paste image URLs to display images)
 - **Links**: Enhanced link handling with popover editor
 
 - **Typography**: Subscript, superscript, highlighting

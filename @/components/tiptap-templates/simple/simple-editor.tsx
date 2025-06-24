@@ -26,8 +26,12 @@ import {
 // --- Custom Extensions ---
 import { Link } from "@/components/tiptap-extension/link-extension"
 import { Selection } from "@/components/tiptap-extension/selection-extension"
+import { SelectionDelete } from "@/components/tiptap-extension/selection-delete-extension"
 import { TrailingNode } from "@/components/tiptap-extension/trailing-node-extension"
 import { KeyboardShortcuts } from "@/components/tiptap-extension/keyboard-shortcuts-extension"
+import { AutoImage } from "@/components/tiptap-extension/auto-image-extension"
+import { CopySanitizer } from "@/components/tiptap-extension/copy-sanitizer-extension"
+import { ImageNodeExtension } from "@/components/tiptap-node/image-node"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
@@ -39,7 +43,6 @@ import {
 } from "@/components/tiptap-ui-primitive/toolbar"
 
 // --- Tiptap Node ---
-import { ImageUploadNode } from "@/components/tiptap-node/image-upload-node/image-upload-node-extension"
 import "@/components/tiptap-node/code-block-node/code-block-node.scss"
 import "@/components/tiptap-node/list-node/list-node.scss"
 import "@/components/tiptap-node/image-node/image-node.scss"
@@ -47,7 +50,6 @@ import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
 
 // --- Tiptap UI ---
 import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
-import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
 import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
 import { BlockQuoteButton } from "@/components/tiptap-ui/blockquote-button"
 import { CodeBlockButton } from "@/components/tiptap-ui/code-block-button"
@@ -80,7 +82,6 @@ import { useFocusMode } from "@/hooks/use-focus-mode"
 import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
 
 // --- Lib ---
-import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
@@ -206,7 +207,6 @@ const MainToolbarContent = ({
       <ToolbarSeparator />
 
       <ToolbarGroup>
-        <ImageUploadButton text="Add" />
         <ThemeToggle />
       </ToolbarGroup>
 
@@ -275,18 +275,14 @@ export function SimpleEditor() {
       },
     },
     extensions: [
-      StarterKit.configure({
-        paragraph: {
-          HTMLAttributes: {
-            style: "text-align: left;"
-          }
-        }
-      }),
+      StarterKit,
       Underline,
       TaskList,
       TaskItem.configure({ nested: true }),
       Highlight.configure({ multicolor: true }),
       Image,
+      ImageNodeExtension,
+      AutoImage,
       Typography,
       Superscript,
       Subscript,
@@ -299,17 +295,11 @@ export function SimpleEditor() {
           items: () => slashCommands,
         },
       }),
+      SelectionDelete, // High priority - must come before Link
       Selection,
-      ImageUploadNode.configure({
-        accept: "image/*",
-        maxSize: MAX_FILE_SIZE,
-        limit: 3,
-        upload: handleImageUpload,
-        onError: (error) => console.error("Upload failed:", error),
-      }),
       TrailingNode.configure({
         node: "paragraph",
-        notAfter: ["paragraph"],
+        notAfter: ["paragraph", "imageNode"],
       }),
       Link.configure({ openOnClick: false }),
       Markdown.configure({
@@ -320,9 +310,10 @@ export function SimpleEditor() {
         linkify: false,              // Create links from "https://..." text
         breaks: false,               // New lines (\n) in markdown input are converted to <br>
         transformPastedText: true,   // Allow to paste markdown text in the editor
-        transformCopiedText: false,  // Copied text is transformed to markdown
+        transformCopiedText: true,   // Transform copied content to Markdown so that clipboard contains Markdown instead of plain text
       }),
       KeyboardShortcuts,
+      CopySanitizer, // Last to override clipboard behavior
     ],
     content: {
       type: "doc",
@@ -377,55 +368,57 @@ export function SimpleEditor() {
   return (
     <EditorContext.Provider value={{ editor }}>
       <SlashCmdProvider>
-        <div className={editorClasses}>
-          <Toolbar
-            ref={toolbarRef}
-            style={
-              isMobile
-                ? {
-                    bottom: `calc(100% - ${windowSize.height - bodyRect.y}px)`,
-                  }
-                : {}
-            }
-          >
-            {mobileView === "main" ? (
-              <MainToolbarContent
-                onHighlighterClick={() => setMobileView("highlighter")}
-                onLinkClick={() => setMobileView("link")}
-                isMobile={isMobile}
-              />
-            ) : (
-              <MobileToolbarContent
-                type={mobileView === "highlighter" ? "highlighter" : "link"}
-                onBack={() => setMobileView("main")}
-              />
-            )}
-          </Toolbar>
+        <div className="simple-editor-shell">
+          <div className={editorClasses}>
+            <Toolbar
+              ref={toolbarRef}
+              style={
+                isMobile
+                  ? {
+                      bottom: `calc(100% - ${windowSize.height - bodyRect.y}px)`,
+                    }
+                  : {}
+              }
+            >
+              {mobileView === "main" ? (
+                <MainToolbarContent
+                  onHighlighterClick={() => setMobileView("highlighter")}
+                  onLinkClick={() => setMobileView("link")}
+                  isMobile={isMobile}
+                />
+              ) : (
+                <MobileToolbarContent
+                  type={mobileView === "highlighter" ? "highlighter" : "link"}
+                  onBack={() => setMobileView("main")}
+                />
+              )}
+            </Toolbar>
 
-          <div className="content-wrapper">
-            <EditorContent
-              editor={editor}
-              role="presentation"
-              className="simple-editor-content"
-            />
-            <div className="tiptap-slash-menu"><SlashCmd.Root editor={editor}>
-              <SlashCmd.Cmd>
-                <SlashCmd.Empty>No commands available</SlashCmd.Empty>
-                <SlashCmd.List>
-                  {slashCommands.map((item) => (
-                    <SlashCmd.Item
-                      key={item.title}
-                      value={item.title}
-                      onCommand={(val) => {
-                        item.command(val)
-                      }}
-                    >
-                      <p>{item.title}</p>
-                    </SlashCmd.Item>
-                  ))}
-                </SlashCmd.List>
-              </SlashCmd.Cmd>
-            </SlashCmd.Root></div>
+            <div className="content-wrapper">
+              <EditorContent
+                editor={editor}
+                role="presentation"
+                className="simple-editor-content"
+              />
+              <div className="tiptap-slash-menu"><SlashCmd.Root editor={editor}>
+                <SlashCmd.Cmd>
+                  <SlashCmd.Empty>No commands available</SlashCmd.Empty>
+                  <SlashCmd.List>
+                    {slashCommands.map((item) => (
+                      <SlashCmd.Item
+                        key={item.title}
+                        value={item.title}
+                        onCommand={(val) => {
+                          item.command(val)
+                        }}
+                      >
+                        <p>{item.title}</p>
+                      </SlashCmd.Item>
+                    ))}
+                  </SlashCmd.List>
+                </SlashCmd.Cmd>
+              </SlashCmd.Root></div>
+            </div>
           </div>
         </div>
       </SlashCmdProvider>

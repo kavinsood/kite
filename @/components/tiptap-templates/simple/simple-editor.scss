@@ -28,6 +28,12 @@ body,
 
 /* Removed global body overflow hidden to allow proper scrolling */
 
+.simple-editor-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 .tiptap.ProseMirror {
   font-family: "DM Sans", sans-serif;
 }
