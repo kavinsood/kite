@@ -11,7 +11,6 @@ import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
-import { TextAlign } from "@tiptap/extension-text-align"
 import { Markdown } from "tiptap-markdown"
 import { Placeholder } from "@tiptap/extension-placeholder"
 
@@ -323,9 +322,6 @@ export function SimpleEditor() {
         transformPastedText: true,   // Allow to paste markdown text in the editor
         transformCopiedText: false,  // Copied text is transformed to markdown
       }),
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
       KeyboardShortcuts,
     ],
     content: {
@@ -333,7 +329,6 @@ export function SimpleEditor() {
       content: [
         {
           type: "paragraph",
-          attrs: { textAlign: "left" },
           content: []
         }
       ]

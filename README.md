@@ -112,7 +112,7 @@ kite/
 - **ColorHighlightPopover**: Text highlighting with color picker
 - **LinkPopover**: Link insertion/editing interface
 - **ImageUploadButton**: File upload handling
-- **TextAlignButton**: Text alignment controls
+
 - **UndoRedoButton**: History navigation
 
 #### Persistence Components
@@ -307,7 +307,7 @@ cn(...classes): string  // Conditional class names
 - **Blocks**: Blockquotes, code blocks
 - **Media**: Image upload with progress tracking
 - **Links**: Enhanced link handling with popover editor
-- **Text Alignment**: Left, center, right, justify
+
 - **Typography**: Subscript, superscript, highlighting
 - **History**: Undo/redo functionality
 
