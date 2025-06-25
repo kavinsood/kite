@@ -50,7 +50,7 @@
 	width: 100vw;
 	margin: 0;
 	padding: 0;
-	overflow: hidden;
+	/* overflow: hidden; */ /* Removed to allow editor scrollbar */
 	background-color: var(--tt-bg-color, #ffffff);
 	color: var(--tt-theme-text, #000000);
 }
@@ -61,7 +61,7 @@ html, body, #root {
 	width: 100%;
 	margin: 0;
 	padding: 0;
-	overflow: hidden;
+	/* overflow: hidden; */ /* Removed to allow editor scrollbar */
 }
 
 /* Dark mode support */
