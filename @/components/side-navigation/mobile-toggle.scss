@@ -1,0 +1,44 @@
+.mobile-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: var(--tt-bg-color, #ffffff);
+  color: var(--tt-theme-text, #374151);
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--tt-hover-bg, #f3f4f6);
+    color: var(--tt-theme-text, #111827);
+  }
+
+  &:focus {
+    outline: 2px solid var(--tt-focus-ring, #3b82f6);
+    outline-offset: 2px;
+  }
+
+  // Dark mode support
+  .dark & {
+    background-color: var(--tt-bg-color);
+    color: var(--tt-theme-text);
+
+    &:hover {
+      background-color: var(--tt-hover-bg);
+      color: var(--tt-theme-text);
+    }
+  }
+
+  // Show only on mobile
+  @media (max-width: 768px) {
+    display: flex;
+  }
+}

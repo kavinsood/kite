@@ -50,9 +50,26 @@
 	width: 100vw;
 	margin: 0;
 	padding: 0;
+	display: flex;
 	/* overflow: hidden; */ /* Removed to allow editor scrollbar */
 	background-color: var(--tt-bg-color, #ffffff);
 	color: var(--tt-theme-text, #000000);
+}
+
+/* Main content area that takes remaining space */
+.app-main-content {
+	flex: 1;
+	margin-left: 240px; /* Width of side navigation */
+	display: flex;
+	flex-direction: column;
+	min-width: 0; /* Allow content to shrink */
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+	.app-main-content {
+		margin-left: 0;
+	}
 }
 
 /* Ensure the root and body are full height with no margins */
@@ -68,4 +85,29 @@ html, body, #root {
 .dark .app-container {
 	background-color: var(--tt-bg-color);
 	color: var(--tt-theme-text);
+}
+
+/* CSS Variables for side navigation theming */
+:root {
+  --tt-border-color: #e5e7eb;
+  --tt-border-color-hover: #d1d5db;
+  --tt-hover-bg: #f3f4f6;
+  --tt-active-bg: #dbeafe;
+  --tt-active-text: #1d4ed8;
+  --tt-active-indicator: #3b82f6;
+  --tt-focus-ring: #3b82f6;
+  --tt-bg-muted: #f3f4f6;
+  --tt-theme-text-muted: #6b7280;
+}
+
+.dark {
+  --tt-border-color: #374151;
+  --tt-border-color-hover: #4b5563;
+  --tt-hover-bg: #1f2937;
+  --tt-active-bg: #1e3a8a;
+  --tt-active-text: #60a5fa;
+  --tt-active-indicator: #60a5fa;
+  --tt-focus-ring: #60a5fa;
+  --tt-bg-muted: #1f2937;
+  --tt-theme-text-muted: #9ca3af;
 }
