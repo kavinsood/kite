@@ -398,6 +398,19 @@ pnpm run deploy
 
 ---
 
+## Sync model
+
+- By default, notes are **local-only** and stored in `localStorage`.
+- To enable sync across devices, open the command palette (`Ctrl/Cmd + K`) and run **“Enable sync”**.
+- You’ll be prompted for a passphrase; the browser hashes this passphrase (SHA-256) and sends only the hash as `X-Bucket-Id` to the Worker.
+- Notes for that bucket are stored in KV under keys of the form `<bucketId>:<noteId>`.
+- On first connect, local and remote notes for the bucket are merged:
+  - If an ID exists locally and remotely, the newer `updatedAt` wins.
+  - Local-only notes are uploaded.
+  - Remote-only notes are downloaded into `localStorage`.
+
+---
+
 ## Design Philosophy (From the Conversation)
 
 Key intentional decisions made during this build:

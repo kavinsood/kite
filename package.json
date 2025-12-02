@@ -29,7 +29,6 @@
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1",
 		"react-swipeable": "^7.0.2",
-		"react-window": "^1.8.10",
 		"tailwind-merge": "^2.5.4"
 	},
 	"devDependencies": {

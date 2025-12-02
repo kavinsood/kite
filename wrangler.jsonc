@@ -1,12 +1,8 @@
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "kite",
 	"main": "worker/index.ts",
-	"compatibility_date": "2025-11-28",
+	"compatibility_date": "2025-11-25",
 	"assets": {
 		"directory": "./dist/client",
 		"binding": "ASSETS",
@@ -19,19 +15,7 @@
 	"kv_namespaces": [
   	{
       "binding": "KV",
-      "id": "865bcb4a5b5c4de1ba70f77f81529d4b",
-      // Optional: preview_id used when running `wrangler dev` for local dev
-      "preview_id": "<ID_OF_PREVIEW_KV_NAMESPACE_FOR_LOCAL_DEVELOPMENT>"
+      "id": "ce8ee0535fa44d98a251837cafbf5b2f"
     }
   ]
-	/**
-	 * Static Assets
-	 * https://developers.cloudflare.com/workers/static-assets/binding/
-	 */
-	// "assets": { "directory": "./public/", "binding": "ASSETS" }
-	/**
-	 * Service Bindings (communicate between multiple Workers)
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-	 */
-	// "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
 }

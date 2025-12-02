@@ -15,6 +15,7 @@ interface CommandPaletteProps {
   onDelete: () => void;
   onTogglePin: (id: string) => void;
   onToggleSidebar?: () => void;
+  onSync?: () => void;
 }
 
 interface CommandItem {
@@ -37,6 +38,7 @@ export function CommandPalette({
   onDelete,
   onTogglePin,
   onToggleSidebar,
+  onSync,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -87,6 +89,19 @@ export function CommandPalette({
         run: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
       },
     ];
+
+    if (onSync) {
+      items.push({
+        id: "sync",
+        label: "Enable sync",
+        description: "Enter a passphrase to sync notes across devices",
+        icon: <Command className="h-4 w-4" />,
+        shortcut: "S",
+        run: () => {
+          onSync();
+        },
+      });
+    }
 
     if (onToggleSidebar) {
       items.push({
@@ -172,7 +187,7 @@ export function CommandPalette({
     }
 
     return items;
-  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme]);
+  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme, onSync]);
 
   const filteredCommands = useMemo(() => {
     const q = query.toLowerCase().trim();

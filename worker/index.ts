@@ -6,41 +6,60 @@ interface NoteMetadata {
   deleted?: boolean;
 }
 
+function getBucket(request: Request): string | null {
+  const header = request.headers.get("X-Bucket-Id");
+  if (!header) return null;
+  return header.trim() || null;
+}
+
+function withBucketId(bucketId: string, id: string): string {
+  return `${bucketId}:${id}`;
+}
+
+function stripBucketPrefix(bucketId: string, key: string): string {
+  const prefix = `${bucketId}:`;
+  return key.startsWith(prefix) ? key.slice(prefix.length) : key;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     // --- API ROUTES ---
     if (url.pathname.startsWith("/api/")) {
+      const bucketId = getBucket(request);
+
       // GET /api/notes - list all non-deleted notes (metadata only)
       if (url.pathname === "/api/notes" && request.method === "GET") {
+        // No bucket means no server-backed notes
+        if (!bucketId) {
+          return Response.json([]);
+        }
+
         /**
          * SCALING LIMITATION:
-         * 
-         * This endpoint fetches ALL notes from KV and sorts them in memory by updatedAt.
-         * KV list ordering is lexicographical by key, not by metadata, so we must fetch
-         * everything to sort by date.
-         * 
-         * For a personal scratchpad with <10k notes, this is acceptable. For larger
-         * scale, consider:
-         * - Edge Config: Maintain a sorted JSON index of note IDs + updatedAt
-         * - D1: Use a relational database for metadata queries
-         * - Summary key: Store a JSON blob with recent notes, update on write
-         * 
-         * Current approach will timeout or OOM with >10k notes.
+         *
+         * This endpoint fetches ALL notes from KV (for the given bucket)
+         * and sorts them in memory by updatedAt.
+         *
+         * For a personal scratchpad with <10k notes per bucket, this is acceptable.
          */
         const notes: Array<{ id: string; title: string; updatedAt: number }> = [];
         let cursor: string | undefined;
 
         // Loop handles >1000 notes pagination automatically
         do {
-          const list = await env.KV.list({ cursor, limit: 1000 });
+          const list = await env.KV.list({
+            prefix: `${bucketId}:`,
+            cursor,
+            limit: 1000,
+          });
           for (const key of list.keys) {
             // Filter out deleted via metadata
             const metadata = (key.metadata || {}) as NoteMetadata;
             if (!metadata.deleted) {
               notes.push({
-                id: key.name,
+                id: stripBucketPrefix(bucketId, key.name),
                 title: metadata.title || "Untitled",
                 updatedAt: metadata.updatedAt || 0,
               });
@@ -55,6 +74,11 @@ export default {
         return Response.json(notes);
       }
 
+      // All remaining API routes require a bucketId
+      if (!bucketId) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+
       // GET /api/note/:id - fetch full content + metadata
       if (url.pathname.startsWith("/api/note/") && request.method === "GET") {
         const id = url.pathname.split("/").pop();
@@ -62,11 +86,13 @@ export default {
           return new Response("Missing id", { status: 400 });
         }
 
+        const key = withBucketId(bucketId, id);
+
         const { value, metadata } = await env.KV.getWithMetadata<{
           title?: string;
           updatedAt?: number;
           deleted?: boolean;
-        }>(id);
+        }>(key);
 
         if (value === null || metadata?.deleted === true) {
           return new Response("Not found", { status: 404 });
@@ -94,12 +120,13 @@ export default {
 
         const title = deriveTitle(content);
         const updatedAt = Date.now();
+        const key = withBucketId(bucketId, id);
 
         // Preserve existing metadata.deleted if present
-        const existing = await env.KV.getWithMetadata<NoteMetadata>(id);
+        const existing = await env.KV.getWithMetadata<NoteMetadata>(key);
 
         // Just write the key. Metadata is indexed by Cloudflare automatically.
-        await env.KV.put(id, content, {
+        await env.KV.put(key, content, {
           metadata: {
             title,
             updatedAt,
@@ -120,15 +147,16 @@ export default {
         }
 
         const { id } = body as { id: string };
+        const key = withBucketId(bucketId, id);
 
-        const { value, metadata } = await env.KV.getWithMetadata<NoteMetadata>(id);
+        const { value, metadata } = await env.KV.getWithMetadata<NoteMetadata>(key);
 
         // If there is no value, we still return success to keep client simple.
         if (value === null) {
           return Response.json({ success: true });
         }
 
-        await env.KV.put(id, value, {
+        await env.KV.put(key, value, {
           metadata: {
             ...(metadata || {}),
             deleted: true,
