@@ -31,6 +31,15 @@ function getInitialIdFromLocation(): string | null {
   return match ? match[1] : null;
 }
 
+function SearchIndexSync({ activeId, content }: { activeId: string | null; content: string }) {
+  const { updateNoteContent } = useSearchIndexContext();
+  useEffect(() => {
+    if (!activeId) return;
+    updateNoteContent(activeId, content);
+  }, [activeId, content, updateNoteContent]);
+  return null;
+}
+
 function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [content, setContent] = useState<string>("");
@@ -80,8 +89,6 @@ function App() {
     bucketId,
     isSynced,
   });
-  const { updateNoteContent } = useSearchIndexContext();
-
   useEffect(() => {
     if (isError) {
       setLoadError("Failed to load notes");
@@ -276,7 +283,6 @@ function App() {
       const trimmed = content.trim();
       if (trimmed === "" && !isPersisted) return;
       updateLocalNoteFromContent(activeId, content);
-      updateNoteContent(activeId, content);
     },
     150,
     [content, activeId, isPersisted, updateLocalNoteFromContent],
@@ -635,6 +641,7 @@ function App() {
         onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
         onSync={handleSync}
       />
+      <SearchIndexSync activeId={activeId} content={content} />
     </SidebarLayout>
     </SearchIndexProvider>
   );
