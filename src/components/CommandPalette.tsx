@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FilePlus, Trash2, Pin, PinOff, Link, Moon, Sun, ArrowUp, ArrowDown, Command } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { Note } from "../types";
-import { useSearchIndex } from "../hooks/useSearchIndex";
+import { useSearchIndexContext } from "../hooks/SearchIndexContext";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -15,7 +15,7 @@ interface CommandPaletteProps {
   onDelete: () => void;
   onTogglePin: (id: string) => void;
   onToggleSidebar?: () => void;
-  onSync?: () => void;
+  onSync?: (passphrase: string) => void;
 }
 
 interface CommandItem {
@@ -41,14 +41,16 @@ export function CommandPalette({
   onSync,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
+  const [isSyncMode, setIsSyncMode] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const { setTheme, resolvedTheme } = useTheme();
-  const { searchWithPositions } = useSearchIndex(notes);
+  const { searchWithPositions } = useSearchIndexContext();
 
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
       setHighlightedIndex(0);
+      setIsSyncMode(false);
     }
   }, [isOpen]);
 
@@ -93,12 +95,16 @@ export function CommandPalette({
     if (onSync) {
       items.push({
         id: "sync",
-        label: "Enable sync",
-        description: "Enter a passphrase to sync notes across devices",
+        label: isSyncMode ? "Enter passphrase" : "Enable sync",
+        description: isSyncMode
+          ? "Type your passphrase above and press Enter"
+          : "Enter a passphrase to sync notes across devices",
         icon: <Command className="h-4 w-4" />,
         shortcut: "S",
         run: () => {
-          onSync();
+          setIsSyncMode(true);
+          setQuery("");
+          setHighlightedIndex(0);
         },
       });
     }
@@ -187,7 +193,7 @@ export function CommandPalette({
     }
 
     return items;
-  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme, onSync]);
+  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme, onSync, isSyncMode]);
 
   const filteredCommands = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -202,7 +208,6 @@ export function CommandPalette({
   const noteResults = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return [];
-    // Use in-memory search index - no localStorage I/O in hot loop
     return searchWithPositions(q, notes);
   }, [notes, query, searchWithPositions]);
 
@@ -221,21 +226,14 @@ export function CommandPalette({
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     const key = event.key.toLowerCase();
-    // Check the input's current value directly to avoid React state timing issues
-    // This ensures shortcuts don't fire when user is typing
     const inputValue = (event.currentTarget as HTMLInputElement).value;
     const hasSearchText = inputValue.trim().length > 0;
-    
-    // Handle keyboard shortcuts when command palette is open
-    // If search is empty, shortcuts execute directly
-    // If search has text, shortcuts are disabled (user is searching)
-    if (!hasSearchText && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-      // Find command by shortcut key
+
+    if (!hasSearchText && !event.ctrlKey && !event.metaKey && !event.shiftKey && !isSyncMode) {
       const command = commands.find(cmd => {
         if (!cmd.shortcut) return false;
-        // Handle "Ctrl+/" format
         if (cmd.shortcut.toLowerCase().includes('ctrl+') || cmd.shortcut.toLowerCase().includes('cmd+')) {
-          return false; // Skip Ctrl/Cmd shortcuts here
+          return false;
         }
         const shortcut = cmd.shortcut.toLowerCase().trim();
         return shortcut === key;
@@ -243,13 +241,18 @@ export function CommandPalette({
       
       if (command) {
         event.preventDefault();
+        if (command.id === "sync") {
+          setIsSyncMode(true);
+          setQuery("");
+          setHighlightedIndex(0);
+          return;
+        }
         command.run();
         onClose();
         return;
       }
     }
     
-    // Navigation keys (only if searching or if no shortcut matched)
     if (!items.length) return;
     if (event.key === "ArrowDown" || (event.key === "j" && hasSearchText)) {
       event.preventDefault();
@@ -259,6 +262,17 @@ export function CommandPalette({
       setHighlightedIndex((prev) => (prev - 1 + items.length) % items.length);
     } else if (event.key === "Enter") {
       event.preventDefault();
+      if (isSyncMode && onSync) {
+        const passphrase = query.trim();
+        if (passphrase) {
+          onSync(passphrase);
+          onClose();
+          setIsSyncMode(false);
+          setQuery("");
+          setHighlightedIndex(0);
+        }
+        return;
+      }
       const item = items[highlightedIndex];
       if (item) {
         handleRun(item as CommandItem | Note);

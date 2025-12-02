@@ -3,6 +3,8 @@ import type { Note } from "../types";
 import { Search } from "./Search";
 import { NoteItem } from "./NoteItem";
 import { ScrollArea } from "./ScrollArea";
+import { previewContent } from "../utils/preview";
+import { getDraftContent, getNoteContent } from "../utils/storage";
 
 interface EnhancedSidebarProps {
   notes: Note[];
@@ -32,11 +34,11 @@ export function EnhancedSidebar({
   const [isScrolled, setIsScrolled] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const [previewsById, setPreviewsById] = useState<Map<string, string>>(new Map());
 
   const isSearching = searchQuery.trim().length > 0;
   const displayNotes = isSearching && searchResults ? searchResults : notes;
 
-  // Ordered notes: pinned first, then by updatedAt
   const orderedNotes = useMemo(() => {
     const pinned = displayNotes.filter((note) => pinnedIds.has(note.id));
     const others = displayNotes.filter((note) => !pinnedIds.has(note.id));
@@ -47,7 +49,27 @@ export function EnhancedSidebar({
     });
   }, [displayNotes, pinnedIds]);
 
-  // Auto-scroll to selected note
+  useEffect(() => {
+    let cancelled = false;
+    const hydratePreviews = async () => {
+      const next = new Map<string, string>();
+      for (const note of notes) {
+        const draft = await getDraftContent(note.id);
+        const saved = await getNoteContent(note.id);
+        const content = draft ?? saved ?? "";
+        const preview = previewContent(content);
+        next.set(note.id, preview);
+      }
+      if (!cancelled) {
+        setPreviewsById(next);
+      }
+    };
+    void hydratePreviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [notes]);
+
   useEffect(() => {
     if (activeId && scrollViewportRef.current) {
       const selectedElement = scrollViewportRef.current.querySelector(`[data-note-id="${activeId}"]`);
@@ -66,7 +88,6 @@ export function EnhancedSidebar({
     setHighlightedIndex(0);
   };
 
-  // Keyboard navigation for search results
   useEffect(() => {
     if (!isSearching || !searchResults) return;
 
@@ -202,6 +223,7 @@ export function EnhancedSidebar({
                   openSwipeItemId={openSwipeItemId}
                   setOpenSwipeItemId={setOpenSwipeItemId}
                   searchQuery={isSearching ? searchQuery : undefined}
+                  preview={previewsById.get(note.id) ?? ""}
                 />
               ))}
             </ul>

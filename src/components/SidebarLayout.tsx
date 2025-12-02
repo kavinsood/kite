@@ -29,7 +29,6 @@ export function SidebarLayout({
 }: SidebarLayoutProps) {
   const isMobile = useMobileDetect();
 
-  // Auto-redirect to first note on desktop when no note is selected
   useEffect(() => {
     if (isMobile === false && !activeId && notes.length > 0) {
       onSelect(notes[0].id);
@@ -37,7 +36,7 @@ export function SidebarLayout({
   }, [isMobile, activeId, notes, onSelect]);
 
   if (isMobile === null) {
-    return null; // Wait for mobile detection
+    return null;
   }
 
   return (

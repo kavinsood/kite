@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { Note } from "../types";
 import { Icons } from "./Icons";
-import { useSearchIndex } from "../hooks/useSearchIndex";
+import { useSearchIndexContext } from "../hooks/SearchIndexContext";
 
 interface SearchProps {
   notes: Note[];
@@ -22,7 +22,7 @@ export function Search({
   setHighlightedIndex,
   clearSearch,
 }: SearchProps) {
-  const { search } = useSearchIndex(notes);
+  const { search } = useSearchIndexContext();
 
   useEffect(() => {
     const q = searchQuery.toLowerCase().trim();

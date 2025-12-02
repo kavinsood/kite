@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense, lazy } from "react";
 import { SidebarLayout } from "./components/SidebarLayout";
-import { Editor } from "./components/Editor";
 import { CommandPalette } from "./components/CommandPalette";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { NoteHeader } from "./components/NoteHeader";
@@ -12,12 +11,19 @@ import { Icons } from "./components/Icons";
 import type { FullNote } from "./types";
 import { useDebouncedEffect } from "./hooks/useDebouncedEffect";
 import { generateBucketId } from "./utils/crypto";
+import { SearchIndexProvider, useSearchIndexContext } from "./hooks/SearchIndexContext";
+import { getDraftContent, getNoteContent, setDraftContent, setNoteContent, deleteDraftContent } from "./utils/storage";
 
 const LAST_ACTIVE_KEY = "lastActiveNoteId";
 const draftKey = (id: string) => `draft:${id}`;
 const PINNED_KEY = "pinnedNotes";
 const BUCKET_ID_KEY = "kite_bucket_id";
 const IS_SYNCED_KEY = "kite_is_synced";
+
+const LazyEditor = lazy(async () => {
+  const mod = await import("./components/Editor");
+  return { default: mod.Editor };
+});
 
 function getInitialIdFromLocation(): string | null {
   const path = window.location.pathname;
@@ -56,24 +62,32 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const isMobile = useMobileDetect();
   const [showSidebar, setShowSidebar] = useState(true);
-  
-  // Handle mobile keyboard
+  const isSyncInProgressRef = useRef(false);
+
   useMobileKeyboard();
 
-  // Data layer: fetching and mutations
-  const { notes, isLoading, isError, saveNote, createNote, deleteNote, saveMutation, refetchNotes } = useNotes({
+  const {
+    notes,
+    isLoading,
+    isError,
+    saveNote,
+    createNote,
+    deleteNote,
+    saveMutation,
+    refetchNotes,
+    updateLocalNoteFromContent,
+  } = useNotes({
     bucketId,
     isSynced,
   });
+  const { updateNoteContent } = useSearchIndexContext();
 
-  // Handle error state
   useEffect(() => {
     if (isError) {
       setLoadError("Failed to load notes");
     }
   }, [isError]);
 
-  // Boot sequence
   useEffect(() => {
     let id = getInitialIdFromLocation();
     if (!id) {
@@ -93,7 +107,6 @@ function App() {
     setActiveId(id);
   }, []);
 
-  // Mobile sidebar behavior: hide sidebar when note is selected
   useEffect(() => {
     if (isMobile !== null) {
       if (isMobile) {
@@ -104,13 +117,11 @@ function App() {
     }
   }, [isMobile, activeId, isSidebarCollapsed]);
 
-  // Persist pinned note ids
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(PINNED_KEY, JSON.stringify(Array.from(pinnedIds)));
   }, [pinnedIds]);
 
-  // Persist sync state
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (bucketId) {
@@ -131,7 +142,6 @@ function App() {
     });
   }, [notes, pinnedIds]);
 
-  // Load sequence when activeId changes
   useEffect(() => {
     let ignore = false;
 
@@ -145,31 +155,29 @@ function App() {
     localStorage.setItem(LAST_ACTIVE_KEY, activeId);
     setRecovered(false);
 
-    const localDraft = localStorage.getItem(draftKey(activeId)) ?? undefined;
+    let localDraft: string | undefined;
 
-    // If we're not in sync mode, rely purely on local drafts/content
-    if (!isSynced || !bucketId) {
-      if (localDraft !== undefined) {
-        if (!ignore) {
-          setContent(localDraft);
-          setLastSavedContent(localDraft);
-          setIsPersisted(true);
+    const loadLocal = async () => {
+      localDraft = (await getDraftContent(activeId)) ?? undefined;
+      if (!isSynced || !bucketId) {
+        if (localDraft !== undefined) {
+          if (!ignore) {
+            setContent(localDraft);
+            setLastSavedContent(localDraft);
+            setIsPersisted(true);
+          }
+        } else {
+          const localContent = (await getNoteContent(activeId)) ?? "";
+          if (!ignore) {
+            setContent(localContent);
+            setLastSavedContent(localContent);
+            setIsPersisted(localContent.length > 0);
+          }
         }
-      } else {
-        const localContent = localStorage.getItem(`note:${activeId}`) ?? "";
-        if (!ignore) {
-          setContent(localContent);
-          setLastSavedContent(localContent);
-          setIsPersisted(localContent.length > 0);
-        }
+        return;
       }
 
-      return () => {
-        ignore = true;
-      };
-    }
-
-    fetch(`/api/note/${activeId}`, {
+      void fetch(`/api/note/${activeId}`, {
       headers: bucketId ? { "X-Bucket-Id": bucketId } : undefined,
     })
       .then(async (res) => {
@@ -195,24 +203,19 @@ function App() {
             setContent(localDraft);
             setRecovered(true);
             setIsPersisted(true);
-            // We consider the server content as the last saved state so that
-            // a subsequent autosave reflects the recovered draft as a real change.
             setLastSavedContent(data.content);
-            // Store server content in localStorage for sidebar preview and search index
-            window.localStorage.setItem(`note:${activeId}`, data.content);
+            void setNoteContent(activeId, data.content);
           }
         } else {
           if (!ignore) {
             setContent(data.content);
             setLastSavedContent(data.content);
             setIsPersisted(true);
-            // Store server content in localStorage for sidebar preview and search index
-            window.localStorage.setItem(`note:${activeId}`, data.content);
+            void setNoteContent(activeId, data.content);
           }
         }
       })
       .catch(() => {
-        // Network error: fall back to draft or empty
         if (ignore) return;
         if (localDraft !== undefined) {
           setContent(localDraft);
@@ -221,16 +224,18 @@ function App() {
         }
         setIsPersisted(false);
       });
+    };
+
+    void loadLocal();
 
     return () => {
       ignore = true;
     };
   }, [activeId, bucketId, isSynced]);
 
-  // Persist drafts in localStorage
   useEffect(() => {
     if (!activeId) return;
-    localStorage.setItem(draftKey(activeId), content);
+    void setDraftContent(activeId, content);
   }, [activeId, content]);
 
   const handleTogglePin = (id: string) => {
@@ -245,34 +250,36 @@ function App() {
     });
   };
 
-  // Connect Debounce to Mutation
   useDebouncedEffect(
     () => {
       if (!activeId) return;
 
-      // If content hasn't changed since last successful save, skip save and reordering.
       if (content === lastSavedContent) {
         return;
       }
 
-      const trimmed = content.trim();
-      if (trimmed === "" && !isPersisted) {
-        return;
-      }
-
-      // Fire the mutation
       saveNote(activeId, content);
       
       setIsPersisted(true);
-      
-      // Handle local storage drafts cleanup
-      window.localStorage.setItem(draftKey(activeId), content);
-      window.localStorage.setItem(`note:${activeId}`, content);
-      localStorage.removeItem(draftKey(activeId));
+
+      void setNoteContent(activeId, content);
+      void deleteDraftContent(activeId);
       setLastSavedContent(content);
     },
     1000,
     [content, activeId, isPersisted, lastSavedContent, saveMutation],
+  );
+
+  useDebouncedEffect(
+    () => {
+      if (!activeId) return;
+      const trimmed = content.trim();
+      if (trimmed === "" && !isPersisted) return;
+      updateLocalNoteFromContent(activeId, content);
+      updateNoteContent(activeId, content);
+    },
+    150,
+    [content, activeId, isPersisted, updateLocalNoteFromContent],
   );
 
   const handleCreate = () => {
@@ -283,7 +290,6 @@ function App() {
     window.history.replaceState(null, "", `/n/${id}`);
     localStorage.setItem(LAST_ACTIVE_KEY, id);
     
-    // Add the new note to the cache so it appears in sidebar
     createNote(id);
     
     if (isMobile) {
@@ -307,8 +313,6 @@ function App() {
     await deleteNote(idToDelete);
     localStorage.removeItem(draftKey(idToDelete));
 
-    // Navigate to next note or create new one
-    // After deletion, notes will be updated by the hook, but we need to check current state
     const remaining = orderedNotes.filter((n) => n.id !== idToDelete);
     if (remaining.length > 0) {
       const nextId = remaining[0].id;
@@ -336,21 +340,19 @@ function App() {
 
       if (key.startsWith("note:")) {
         const id = key.slice("note:".length);
-        const content = window.localStorage.getItem(key) ?? "";
         const updatedAt = Number(
           window.localStorage.getItem(`noteMeta:${id}:updatedAt`) ?? Date.now()
         );
-        map.set(id, { content, updatedAt });
+        map.set(id, { content: "", updatedAt });
       }
 
       if (key.startsWith("draft:")) {
         const id = key.slice("draft:".length);
-        const content = window.localStorage.getItem(key) ?? "";
         const metaKey = `noteMeta:${id}:updatedAt`;
         const updatedAt = Number(window.localStorage.getItem(metaKey) ?? Date.now());
         const existing = map.get(id);
         if (!existing || updatedAt >= existing.updatedAt) {
-          map.set(id, { content, updatedAt });
+          map.set(id, { content: "", updatedAt });
         }
       }
     }
@@ -358,22 +360,23 @@ function App() {
     return map;
   };
 
-  const handleSync = async () => {
+  const handleSync = async (passphrase: string) => {
     if (typeof window === "undefined") return;
-    const passphrase = window.prompt("Enter passphrase for sync:");
-    if (!passphrase) return;
+    if (isSyncInProgressRef.current) return;
+    const trimmed = passphrase.trim();
+    if (!trimmed) return;
 
-    const id = await generateBucketId(passphrase);
-    setBucketId(id);
-    window.localStorage.setItem(BUCKET_ID_KEY, id);
-
+    isSyncInProgressRef.current = true;
     try {
-      // Fetch remote list for this bucket
+      const id = await generateBucketId(trimmed);
       const res = await fetch("/api/notes", {
         headers: {
           "X-Bucket-Id": id,
         },
       });
+      if (!res.ok) {
+        throw new Error("Failed to fetch remote notes");
+      }
       const remoteNotes = (await res.json()) as { id: string; title: string; updatedAt: number }[];
       const remoteMap = new Map<string, { updatedAt: number }>();
       for (const note of remoteNotes) {
@@ -387,27 +390,53 @@ function App() {
         ...Array.from(remoteMap.keys()),
       ]);
 
+      let hadSyncError = false;
+
+      const safeSave = async (noteId: string, content: string) => {
+        try {
+          const saveRes = await fetch("/api/save", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Bucket-Id": id,
+            },
+            body: JSON.stringify({ id: noteId, content }),
+          });
+          if (!saveRes.ok) {
+            hadSyncError = true;
+          }
+        } catch {
+          hadSyncError = true;
+        }
+      };
+
+      const safeLoad = async (noteId: string) => {
+        try {
+          const noteRes = await fetch(`/api/note/${noteId}`, {
+            headers: { "X-Bucket-Id": id },
+          });
+          if (!noteRes.ok) {
+            hadSyncError = true;
+            return null;
+          }
+          const full = (await noteRes.json()) as FullNote;
+          return full;
+        } catch {
+          hadSyncError = true;
+          return null;
+        }
+      };
+
       for (const idOfNote of allIds) {
         const local = localMap.get(idOfNote);
         const remote = remoteMap.get(idOfNote);
 
         if (local && remote) {
-          // Both exist: keep newer
           if (local.updatedAt >= remote.updatedAt) {
-            await fetch("/api/save", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Bucket-Id": id,
-              },
-              body: JSON.stringify({ id: idOfNote, content: local.content }),
-            });
+            await safeSave(idOfNote, local.content);
           } else {
-            const noteRes = await fetch(`/api/note/${idOfNote}`, {
-              headers: { "X-Bucket-Id": id },
-            });
-            if (noteRes.ok) {
-              const full = (await noteRes.json()) as FullNote;
+            const full = await safeLoad(idOfNote);
+            if (full) {
               window.localStorage.setItem(`note:${idOfNote}`, full.content);
               window.localStorage.setItem(
                 `noteMeta:${idOfNote}:updatedAt`,
@@ -416,22 +445,10 @@ function App() {
             }
           }
         } else if (local && !remote) {
-          // Only local: upload
-          await fetch("/api/save", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Bucket-Id": id,
-            },
-            body: JSON.stringify({ id: idOfNote, content: local.content }),
-          });
+          await safeSave(idOfNote, local.content);
         } else if (!local && remote) {
-          // Only remote: download
-          const noteRes = await fetch(`/api/note/${idOfNote}`, {
-            headers: { "X-Bucket-Id": id },
-          });
-          if (noteRes.ok) {
-            const full = (await noteRes.json()) as FullNote;
+          const full = await safeLoad(idOfNote);
+          if (full) {
             window.localStorage.setItem(`note:${idOfNote}`, full.content);
             window.localStorage.setItem(
               `noteMeta:${idOfNote}:updatedAt`,
@@ -441,17 +458,21 @@ function App() {
         }
       }
 
-      setIsSynced(true);
-      window.localStorage.setItem(IS_SYNCED_KEY, "true");
-      void refetchNotes();
+      if (!hadSyncError) {
+        setBucketId(id);
+        setIsSynced(true);
+        window.localStorage.setItem(BUCKET_ID_KEY, id);
+        window.localStorage.setItem(IS_SYNCED_KEY, "true");
+        void refetchNotes();
+      }
     } catch {
-      // If merge fails, stay in local-only mode
       setIsSynced(false);
       window.localStorage.setItem(IS_SYNCED_KEY, "false");
+    } finally {
+      isSyncInProgressRef.current = false;
     }
   };
 
-  // Keyboard shortcuts
   useShortcuts({
     activeId,
     orderedNotes,
@@ -468,15 +489,15 @@ function App() {
     onToggleSidebar: () => setIsSidebarCollapsed((prev) => !prev),
   });
 
-  // Get updatedAt for current note
   const currentNote = orderedNotes.find((n) => n.id === activeId);
   const noteUpdatedAt = currentNote?.updatedAt ?? Date.now();
 
   if (isMobile === null) {
-    return null; // Wait for mobile detection
+    return null;
   }
 
   return (
+    <SearchIndexProvider notes={orderedNotes}>
     <SidebarLayout
       notes={orderedNotes}
       activeId={activeId}
@@ -543,7 +564,15 @@ function App() {
             </div>
           </div>
           <div className="flex-1 overflow-hidden">
-            <Editor content={content} onChange={setContent} />
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-xs text-muted">
+                  Loading editor...
+                </div>
+              }
+            >
+              <LazyEditor content={content} onChange={setContent} />
+            </Suspense>
           </div>
         </>
         ) : (
@@ -605,6 +634,7 @@ function App() {
         onSync={handleSync}
       />
     </SidebarLayout>
+    </SearchIndexProvider>
   );
 }
 

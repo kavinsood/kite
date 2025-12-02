@@ -4,7 +4,6 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import { useSwipeable } from "react-swipeable";
 import type { Note } from "../types";
 import { getShortDate } from "../utils/date";
-import { previewContent } from "../utils/preview";
 import { SwipeActions } from "./SwipeActions";
 
 interface NoteItemProps {
@@ -21,6 +20,7 @@ interface NoteItemProps {
   openSwipeItemId: string | null;
   setOpenSwipeItemId: (id: string | null) => void;
   searchQuery?: string;
+  preview: string;
 }
 
 // Helper to highlight search terms (handles multiple matches)
@@ -58,15 +58,6 @@ function highlightText(text: string, query: string): React.ReactNode {
   return parts.length > 0 ? <>{parts}</> : text;
 }
 
-function getLocalContent(id: string): string {
-  if (typeof window === "undefined") return "";
-  const draft = window.localStorage.getItem(`draft:${id}`);
-  if (draft !== null) return draft;
-  const saved = window.localStorage.getItem(`note:${id}`);
-  if (saved !== null) return saved;
-  return "";
-}
-
 export const NoteItem = memo(function NoteItem({
   note,
   activeId,
@@ -81,24 +72,13 @@ export const NoteItem = memo(function NoteItem({
   openSwipeItemId,
   setOpenSwipeItemId,
   searchQuery,
+  preview,
 }: NoteItemProps) {
-  const itemRef = useRef<HTMLLIElement>(null);
+  const itemRef = useRef<HTMLDivElement>(null);
   const isActive = activeId === note.id;
   const isPinned = pinnedIds.has(note.id);
   const isSwipeOpen = openSwipeItemId === note.id;
-  const content = getLocalContent(note.id);
-  const preview = previewContent(content);
   const date = getShortDate(note.updatedAt);
-
-  // Auto-scroll to active note
-  useEffect(() => {
-    if (isActive && itemRef.current) {
-      itemRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    }
-  }, [isActive]);
 
   const handlers = useSwipeable({
     onSwipeStart: () => {
@@ -125,8 +105,6 @@ export const NoteItem = memo(function NoteItem({
   });
 
   const [isSwiping, setIsSwiping] = useState(false);
-
-  // Prevent scroll when swiping on mobile
   useEffect(() => {
     if (!isMobile) return;
     
@@ -154,23 +132,9 @@ export const NoteItem = memo(function NoteItem({
     }
   };
 
-  // Extract ref from handlers if it exists
-  const { ref: swipeRef, ...swipeHandlers } = handlers as any;
-
   const NoteContent = (
     <li
       data-note-id={note.id}
-      {...swipeHandlers}
-      ref={(node) => {
-        itemRef.current = node;
-        if (swipeRef) {
-          if (typeof swipeRef === 'function') {
-            swipeRef(node);
-          } else if (swipeRef) {
-            swipeRef.current = node;
-          }
-        }
-      }}
       className={`relative h-[70px] w-full overflow-hidden ${
         (isSearching && isHighlighted) || (!isSearching && isActive)
           ? "bg-[var(--highlight)] text-[var(--highlight-text)] rounded-md"
@@ -184,6 +148,8 @@ export const NoteItem = memo(function NoteItem({
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>
           <div
+            {...handlers}
+            ref={itemRef}
             className={`h-full w-full transition-transform duration-300 ease-out ${
               isSwipeOpen ? "transform -translate-x-32" : ""
             }`}

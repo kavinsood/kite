@@ -48,7 +48,6 @@ const editorTheme = EditorView.theme({
   },
 });
 
-// Widget to hide markdown syntax characters
 class HideSyntaxWidget extends WidgetType {
   constructor() {
     super();
@@ -65,7 +64,6 @@ class HideSyntaxWidget extends WidgetType {
   }
 }
 
-// Image preview widget
 class ImagePreviewWidget extends WidgetType {
   url: string;
   alt: string;
@@ -102,7 +100,6 @@ class ImagePreviewWidget extends WidgetType {
   }
 }
 
-// Markdown rendering plugin
 const markdownRenderPlugin = ViewPlugin.fromClass(
   class {
     decorations;
@@ -126,18 +123,15 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
             const nodeName = node.name;
             const nodeFrom = node.from;
             const nodeTo = node.to;
-            
-            // Headings: ATXHeading1 through ATXHeading6
+
             if (nodeName.startsWith("ATXHeading")) {
               const level = parseInt(nodeName.replace("ATXHeading", "")) || 1;
-              
-              // Find the heading marker node (the # symbols)
+
               let markerFrom = nodeFrom;
               let markerTo = nodeFrom;
               let contentFrom = nodeFrom;
               let contentTo = nodeTo;
-              
-              // Traverse children to find the marker and content
+
               const headingText = view.state.doc.sliceString(nodeFrom, nodeTo);
               const markerMatch = /^(#{1,6})\s+/.exec(headingText);
               if (markerMatch) {
@@ -145,8 +139,6 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
                 contentFrom = markerTo;
                 contentTo = nodeTo;
               }
-              
-              // Hide the # symbols
               if (markerTo > markerFrom) {
                 builder.add(
                   markerFrom,
@@ -157,8 +149,6 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
                   })
                 );
               }
-              
-              // Style the heading content
               const headingSize = {
                 1: "1.6rem",
                 2: "1.35rem",
@@ -180,29 +170,24 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
               }
             }
             
-            // Bold: StrongEmphasis
             else if (nodeName === "StrongEmphasis") {
               const text = view.state.doc.sliceString(nodeFrom, nodeTo);
-              // Find the delimiter (either ** or __)
               const delimiterMatch = /^(\*\*|__)/.exec(text);
               if (delimiterMatch) {
                 const delimiterLength = delimiterMatch[1].length;
                 const contentFrom = nodeFrom + delimiterLength;
                 const contentTo = nodeTo - delimiterLength;
-                
-                // Hide the opening delimiter
+
                 builder.add(nodeFrom, contentFrom, Decoration.replace({
                   widget: new HideSyntaxWidget(),
                   inclusive: false,
                 }));
-                
-                // Hide the closing delimiter
+
                 builder.add(contentTo, nodeTo, Decoration.replace({
                   widget: new HideSyntaxWidget(),
                   inclusive: false,
                 }));
-                
-                // Style the content
+
                 if (contentTo > contentFrom) {
                   builder.add(contentFrom, contentTo, Decoration.mark({
                     class: "cm-markdown-bold",
@@ -211,34 +196,27 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
               }
             }
             
-            // Italic: Emphasis (but not StrongEmphasis)
             else if (nodeName === "Emphasis") {
               const text = view.state.doc.sliceString(nodeFrom, nodeTo);
-              // Check if this is actually bold by checking if it starts with ** or __
-              // CodeMirror may parse **text** as nested Emphasis nodes, so we skip if it looks like bold
               const isBold = text.startsWith("**") || text.startsWith("__");
               
               if (!isBold) {
-                // Find the delimiter (either * or _)
                 const delimiterMatch = /^(\*|_)/.exec(text);
                 if (delimiterMatch) {
                   const delimiterLength = 1;
                   const contentFrom = nodeFrom + delimiterLength;
                   const contentTo = nodeTo - delimiterLength;
-                  
-                  // Hide the opening delimiter
+
                   builder.add(nodeFrom, contentFrom, Decoration.replace({
                     widget: new HideSyntaxWidget(),
                     inclusive: false,
                   }));
-                  
-                  // Hide the closing delimiter
+
                   builder.add(contentTo, nodeTo, Decoration.replace({
                     widget: new HideSyntaxWidget(),
                     inclusive: false,
                   }));
-                  
-                  // Style the content
+
                   if (contentTo > contentFrom) {
                     builder.add(contentFrom, contentTo, Decoration.mark({
                       class: "cm-markdown-italic",
@@ -248,24 +226,20 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
               }
             }
             
-            // Strikethrough
             else if (nodeName === "Strikethrough") {
-              const contentFrom = nodeFrom + 2; // Skip ~~
+              const contentFrom = nodeFrom + 2;
               const contentTo = nodeTo - 2;
-              
-              // Hide the opening ~~
+
               builder.add(nodeFrom, contentFrom, Decoration.replace({
                 widget: new HideSyntaxWidget(),
                 inclusive: false,
               }));
-              
-              // Hide the closing ~~
+
               builder.add(contentTo, nodeTo, Decoration.replace({
                 widget: new HideSyntaxWidget(),
                 inclusive: false,
               }));
-              
-              // Style the content
+
               if (contentTo > contentFrom) {
                 builder.add(contentFrom, contentTo, Decoration.mark({
                   class: "cm-markdown-strikethrough",
@@ -273,16 +247,13 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
               }
             }
             
-            // Images
             else if (nodeName === "Image") {
-              // Extract alt text and URL from the image node
               const imageText = view.state.doc.sliceString(nodeFrom, nodeTo);
               const imageMatch = /!\[([^\]]*)\]\(([^)]+)\)/.exec(imageText);
               if (imageMatch) {
                 const alt = imageMatch[1];
                 const url = imageMatch[2];
-                
-                // Replace entire image syntax with preview widget
+
                 builder.add(nodeFrom, nodeTo, Decoration.replace({
                   widget: new ImagePreviewWidget(url, alt),
                   inclusive: false,
@@ -301,7 +272,6 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
   }
 );
 
-// Task checkbox widget (existing)
 class TaskCheckboxWidget extends WidgetType {
   checked: boolean;
   lineFrom: number;
@@ -376,25 +346,21 @@ const taskListPlugin = ViewPlugin.fromClass(
   },
 );
 
-// Prevent Ctrl+/ from inserting markdown comment
 const preventCommentKeymap = keymap.of([
   {
     key: "Mod-/",
-    run: () => false, // Prevent default behavior
+    run: () => false,
   },
 ]);
 
-// Tab indentation - 2 spaces, respects copy/paste
 const tabIndent = keymap.of([
   {
     key: "Tab",
     run: (view: EditorView) => {
       const selection = view.state.selection;
       if (selection.ranges.some(r => !r.empty)) {
-        // If text is selected, indent the selection (uses 2 spaces from config)
         return indentSelection(view);
       } else {
-        // Otherwise, insert 2 spaces
         view.dispatch({
           changes: { from: selection.main.from, insert: "  " },
           selection: { anchor: selection.main.from + 2 },
@@ -408,10 +374,8 @@ const tabIndent = keymap.of([
     run: (view: EditorView) => {
       const selection = view.state.selection;
       if (selection.ranges.some(r => !r.empty)) {
-        // If text is selected, unindent
         return indentLess(view);
       } else {
-        // Otherwise, remove 2 spaces from start of line if present
         const line = view.state.doc.lineAt(selection.main.from);
         const lineText = line.text;
         if (lineText.startsWith("  ")) {
@@ -428,7 +392,6 @@ const tabIndent = keymap.of([
 
 export function Editor({ content, onChange }: EditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
 
   return (
     <div ref={editorRef} className="h-full w-full overflow-hidden bg-background relative">
@@ -437,21 +400,13 @@ export function Editor({ content, onChange }: EditorProps) {
         height="100vh"
         extensions={[
           markdown(),
-          indentUnit.of("  "), // 2 spaces for indentation
+          indentUnit.of("  "),
           editorTheme,
           taskListPlugin,
           markdownRenderPlugin,
           preventCommentKeymap,
           tabIndent,
           EditorView.lineWrapping,
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged || update.selectionSet) {
-              // Store view reference
-              if (update.view) {
-                viewRef.current = update.view;
-              }
-            }
-          }),
         ]}
         onChange={onChange}
         className="h-full"

@@ -12,10 +12,6 @@ interface UseShortcutsOptions {
   onToggleSidebar: () => void;
 }
 
-/**
- * Hook that handles keyboard shortcuts for note navigation and commands.
- * Extracted from App.tsx to separate concerns.
- */
 export function useShortcuts({
   activeId,
   orderedNotes,
@@ -32,11 +28,9 @@ export function useShortcuts({
       const isTyping =
         ["INPUT", "TEXTAREA"].includes(target.tagName) || target.isContentEditable;
 
-      // Allow Ctrl/Cmd+K even while typing
       const isCommandShortcut =
         (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
 
-      // Allow Ctrl/Cmd+/ to toggle sidebar even while typing
       const isSidebarToggleShortcut =
         (event.metaKey || event.ctrlKey) && event.key === "/";
 

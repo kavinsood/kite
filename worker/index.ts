@@ -36,42 +36,33 @@ export default {
           return Response.json([]);
         }
 
-        /**
-         * SCALING LIMITATION:
-         *
-         * This endpoint fetches ALL notes from KV (for the given bucket)
-         * and sorts them in memory by updatedAt.
-         *
-         * For a personal scratchpad with <10k notes per bucket, this is acceptable.
-         */
+        const cursorParam = url.searchParams.get("cursor") || undefined;
+
+        const list = await env.KV.list({
+          prefix: `${bucketId}:`,
+          cursor: cursorParam,
+          limit: 500,
+        });
+
         const notes: Array<{ id: string; title: string; updatedAt: number }> = [];
-        let cursor: string | undefined;
 
-        // Loop handles >1000 notes pagination automatically
-        do {
-          const list = await env.KV.list({
-            prefix: `${bucketId}:`,
-            cursor,
-            limit: 1000,
-          });
-          for (const key of list.keys) {
-            // Filter out deleted via metadata
-            const metadata = (key.metadata || {}) as NoteMetadata;
-            if (!metadata.deleted) {
-              notes.push({
-                id: stripBucketPrefix(bucketId, key.name),
-                title: metadata.title || "Untitled",
-                updatedAt: metadata.updatedAt || 0,
-              });
-            }
+        for (const key of list.keys) {
+          const metadata = (key.metadata || {}) as NoteMetadata;
+          if (!metadata.deleted) {
+            notes.push({
+              id: stripBucketPrefix(bucketId, key.name),
+              title: metadata.title || "Untitled",
+              updatedAt: metadata.updatedAt || 0,
+            });
           }
-          cursor = list.list_complete ? undefined : list.cursor;
-        } while (cursor);
+        }
 
-        // Sort in memory (fast enough for <10k notes, but see scaling limitation above)
         notes.sort((a, b) => b.updatedAt - a.updatedAt);
 
-        return Response.json(notes);
+        return Response.json({
+          notes,
+          cursor: list.list_complete ? null : list.cursor,
+        });
       }
 
       // All remaining API routes require a bucketId
@@ -109,28 +100,46 @@ export default {
       // POST /api/save - upsert content + metadata (server derives title)
       if (url.pathname === "/api/save" && request.method === "POST") {
         const body = (await request.json().catch(() => null)) as
-          | { id: string; content: string }
+          | { id: string; content: string; clientUpdatedAt?: number }
           | null;
 
         if (!body || typeof body.id !== "string" || typeof body.content !== "string") {
           return new Response("Invalid body", { status: 400 });
         }
 
-        const { id, content } = body as { id: string; content: string };
+        const { id, content, clientUpdatedAt } = body as {
+          id: string;
+          content: string;
+          clientUpdatedAt?: number;
+        };
 
         const title = deriveTitle(content);
         const updatedAt = Date.now();
         const key = withBucketId(bucketId, id);
 
-        // Preserve existing metadata.deleted if present
         const existing = await env.KV.getWithMetadata<NoteMetadata>(key);
+
+        const existingUpdatedAt = existing.metadata?.updatedAt ?? 0;
+        if (
+          typeof clientUpdatedAt === "number" &&
+          clientUpdatedAt < existingUpdatedAt
+        ) {
+          return Response.json(
+            {
+              success: false,
+              conflict: true,
+              updatedAt: existingUpdatedAt,
+            },
+            { status: 409 },
+          );
+        }
 
         // Just write the key. Metadata is indexed by Cloudflare automatically.
         await env.KV.put(key, content, {
           metadata: {
             title,
             updatedAt,
-            deleted: existing.metadata?.deleted ?? false, // reviving if it was deleted
+            deleted: existing.metadata?.deleted ?? false,
           },
         });
 

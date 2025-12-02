@@ -1,28 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Note } from '../types';
 import { deriveTitle } from '../utils/title';
+import { getNoteContent, getDraftContent, deleteNoteContent, setNoteContent } from '../utils/storage';
 
 type UseNotesOptions = {
   bucketId: string | null;
   isSynced: boolean;
 };
 
-async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, init);
-  if (!res.ok) {
-    throw new Error(`Request failed: ${res.status}`);
-  }
-  return (await res.json()) as T;
-}
-
-/**
- * Build a notes list from localStorage only.
- * Used when the app is in local-only mode (no sync).
- */
-function getLocalNotes(): Note[] {
+async function getLocalNotes(): Promise<Note[]> {
   if (typeof window === 'undefined') return [];
 
-  const notesById = new Map<string, Note>();
+  const notesById = new Map<string, { content: string; updatedAt: number }>();
 
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = window.localStorage.key(i);
@@ -30,26 +19,43 @@ function getLocalNotes(): Note[] {
 
     if (key.startsWith('note:')) {
       const id = key.slice('note:'.length);
-      const content = window.localStorage.getItem(key) ?? '';
-      const title = deriveTitle(content);
+      const content = (await getNoteContent(id)) ?? '';
       const updatedAt = Number(
         window.localStorage.getItem(`noteMeta:${id}:updatedAt`) ?? Date.now(),
       );
-      notesById.set(id, { id, title, updatedAt });
+      notesById.set(id, { content, updatedAt });
+    }
+
+    if (key.startsWith('draft:')) {
+      const id = key.slice('draft:'.length);
+      const content = (await getDraftContent(id)) ?? '';
+      const updatedAt = Number(
+        window.localStorage.getItem(`noteMeta:${id}:updatedAt`) ?? Date.now(),
+      );
+      const existing = notesById.get(id);
+      if (!existing || updatedAt >= existing.updatedAt) {
+        notesById.set(id, { content, updatedAt });
+      }
     }
   }
 
-  return Array.from(notesById.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+  return Array.from(notesById.entries())
+    .map(([id, { content, updatedAt }]) => ({
+      id,
+      title: deriveTitle(content),
+      updatedAt,
+    }))
+    .filter((note) => note.title.trim().length > 0 || updatedAtIsMeaningful(note.updatedAt))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-/**
- * Hook that manages note data fetching and mutations.
- * Handles React Query operations, optimistic updates, and cache management.
- */
+function updatedAtIsMeaningful(timestamp: number): boolean {
+  return !Number.isNaN(timestamp);
+}
+
 export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
   const queryClient = useQueryClient();
 
-  // Fetch notes list
   const {
     data: notes = [],
     isLoading,
@@ -59,19 +65,31 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
     queryKey: ['notes', bucketId, isSynced],
     queryFn: async () => {
       if (!isSynced || !bucketId) {
-        // Local-only mode
         return getLocalNotes();
       }
 
-      return fetchJson<Note[]>('/api/notes', {
-        headers: {
-          'X-Bucket-Id': bucketId,
-        },
-      });
+      const all: Note[] = [];
+      let cursor: string | null = null;
+
+      do {
+        const url = cursor ? `/api/notes?cursor=${encodeURIComponent(cursor)}` : '/api/notes';
+        const res = await fetch(url, {
+          headers: {
+            'X-Bucket-Id': bucketId,
+          },
+        });
+        if (!res.ok) {
+          throw new Error(`Request failed: ${res.status}`);
+        }
+        const data = (await res.json()) as { notes: Note[]; cursor: string | null };
+        all.push(...data.notes);
+        cursor = data.cursor;
+      } while (cursor);
+
+      return all;
     },
   });
 
-  // Save note mutation with optimistic updates
   const saveMutation = useMutation({
     mutationFn: async ({ id, content }: { id: string; content: string }) => {
       if (!isSynced || !bucketId) {
@@ -91,37 +109,64 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
         return { success: true, updatedAt: now };
       }
 
-      return fetchJson<{ success: boolean; updatedAt: number }>('/api/save', {
+      const currentNotes = queryClient.getQueryData<Note[]>(['notes', bucketId, isSynced]) ?? [];
+      const existing = currentNotes.find((n) => n.id === id);
+      const clientUpdatedAt = existing?.updatedAt ?? 0;
+
+      const res = await fetch('/api/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Bucket-Id': bucketId,
         },
-        body: JSON.stringify({ id, content }),
+        body: JSON.stringify({ id, content, clientUpdatedAt }),
       });
+
+      if (res.status === 409) {
+        await res.json().catch(() => null);
+        const noteRes = await fetch(`/api/note/${id}`, {
+          headers: { 'X-Bucket-Id': bucketId },
+        });
+        if (noteRes.ok) {
+          const full = (await noteRes.json()) as { content: string; updatedAt: number };
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(
+              `noteMeta:${id}:updatedAt`,
+              String(full.updatedAt),
+            );
+          }
+          await setNoteContent(id, full.content);
+          queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
+            const others = old.filter((n) => n.id !== id);
+            const title = deriveTitle(full.content);
+            return [{ id, title, updatedAt: full.updatedAt }, ...others];
+          });
+        }
+        throw new Error('Conflict saving note');
+      }
+
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+
+      return (await res.json()) as { success: boolean; updatedAt: number };
     },
-    // OPTIMISTIC UPDATE START
     onMutate: async (newNote) => {
       if (!isSynced || !bucketId) {
-        // Optimistic updates for local mode handled in mutationFn
         return {};
       }
 
       await queryClient.cancelQueries({ queryKey: ['notes', bucketId, isSynced] });
       const previousNotes = queryClient.getQueryData<Note[]>(['notes', bucketId, isSynced]);
-
-      // Optimistically update the sidebar title/order
       queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
         const title = deriveTitle(newNote.content);
         const now = Date.now();
         const otherNotes = old.filter((n) => n.id !== newNote.id);
-        // Put updated note at the top
         return [{ id: newNote.id, title, updatedAt: now }, ...otherNotes];
       });
 
       return { previousNotes };
     },
-    // Rollback on error
     onError: (_err, _newNote, context) => {
       if (!isSynced || !bucketId) return;
       if (context?.previousNotes) {
@@ -131,7 +176,6 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
     onSuccess: (data, variables) => {
       const updatedAt = (data as { updatedAt?: number }).updatedAt ?? Date.now();
 
-      // Persist basic metadata locally for ordering/search index
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(`noteMeta:${variables.id}:updatedAt`, String(updatedAt));
       }
@@ -145,28 +189,17 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
     // OPTIMISTIC UPDATE END
   });
 
-  /**
-   * Save a note (triggers mutation)
-   */
   const saveNote = (id: string, content: string) => {
     saveMutation.mutate({ id, content });
   };
 
-  /**
-   * Create a new note in the cache (doesn't save to server until content is added)
-   */
   const createNote = (id: string) => {
     queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
-      // Check if note already exists
       if (old.some((n) => n.id === id)) return old;
-      // Add new note at the top
       return [{ id, title: "Untitled", updatedAt: Date.now() }, ...old];
     });
   };
 
-  /**
-   * Delete a note from server and cache
-   */
   const deleteNote = async (id: string): Promise<void> => {
     try {
       if (isSynced && bucketId) {
@@ -188,10 +221,24 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
       // Also clean up local metadata
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(`noteMeta:${id}:updatedAt`);
-        window.localStorage.removeItem(`note:${id}`);
       }
+      await deleteNoteContent(id);
     } catch {
       // deletion failure is non-fatal; we simply keep the note
+    }
+  };
+
+  const updateLocalNoteFromContent = (id: string, content: string) => {
+    const now = Date.now();
+    const title = deriveTitle(content);
+
+    queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
+      const others = old.filter((n) => n.id !== id);
+      return [{ id, title, updatedAt: now }, ...others];
+    });
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(`noteMeta:${id}:updatedAt`, String(now));
     }
   };
 
@@ -204,6 +251,7 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
     deleteNote,
     saveMutation,
     refetchNotes: refetch,
+    updateLocalNoteFromContent,
   };
 }
 
