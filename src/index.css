@@ -116,6 +116,12 @@
   display: none;
 }
 
+.cm-editor .cm-hidden-syntax {
+  color: transparent;
+  font-size: 0;
+  opacity: 0;
+}
+
 /* Markdown styling */
 .cm-markdown-heading {
   display: block;

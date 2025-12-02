@@ -16,6 +16,8 @@ interface CommandPaletteProps {
   onTogglePin: (id: string) => void;
   onToggleSidebar?: () => void;
   onSync?: (passphrase: string) => void;
+  isSynced?: boolean;
+  onDisableSync?: () => void;
 }
 
 interface CommandItem {
@@ -39,6 +41,8 @@ export function CommandPalette({
   onTogglePin,
   onToggleSidebar,
   onSync,
+  isSynced = false,
+  onDisableSync,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [isSyncMode, setIsSyncMode] = useState(false);
@@ -92,7 +96,7 @@ export function CommandPalette({
       },
     ];
 
-    if (onSync) {
+    if (onSync && !isSynced) {
       items.push({
         id: "sync",
         label: isSyncMode ? "Enter passphrase" : "Enable sync",
@@ -105,6 +109,20 @@ export function CommandPalette({
           setIsSyncMode(true);
           setQuery("");
           setHighlightedIndex(0);
+        },
+      });
+    }
+
+    if (isSynced && onDisableSync) {
+      items.push({
+        id: "disable-sync",
+        label: "Disable sync",
+        description: "Stop syncing and use local storage only",
+        icon: <Command className="h-4 w-4" />,
+        shortcut: "S",
+        run: () => {
+          onDisableSync();
+          onClose();
         },
       });
     }
@@ -193,7 +211,7 @@ export function CommandPalette({
     }
 
     return items;
-  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme, onSync, isSyncMode]);
+  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme, onSync, isSyncMode, isSynced, onDisableSync]);
 
   const filteredCommands = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -225,44 +243,10 @@ export function CommandPalette({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    const key = event.key.toLowerCase();
-    const inputValue = (event.currentTarget as HTMLInputElement).value;
-    const hasSearchText = inputValue.trim().length > 0;
-
-    if (!hasSearchText && !event.ctrlKey && !event.metaKey && !event.shiftKey && !isSyncMode) {
-      const command = commands.find(cmd => {
-        if (!cmd.shortcut) return false;
-        if (cmd.shortcut.toLowerCase().includes('ctrl+') || cmd.shortcut.toLowerCase().includes('cmd+')) {
-          return false;
-        }
-        const shortcut = cmd.shortcut.toLowerCase().trim();
-        return shortcut === key;
-      });
-      
-      if (command) {
+    // In sync mode, only handle Enter and Escape
+    if (isSyncMode) {
+      if (event.key === "Enter" && onSync) {
         event.preventDefault();
-        if (command.id === "sync") {
-          setIsSyncMode(true);
-          setQuery("");
-          setHighlightedIndex(0);
-          return;
-        }
-        command.run();
-        onClose();
-        return;
-      }
-    }
-    
-    if (!items.length) return;
-    if (event.key === "ArrowDown" || (event.key === "j" && hasSearchText)) {
-      event.preventDefault();
-      setHighlightedIndex((prev) => (prev + 1) % items.length);
-    } else if (event.key === "ArrowUp" || (event.key === "k" && hasSearchText)) {
-      event.preventDefault();
-      setHighlightedIndex((prev) => (prev - 1 + items.length) % items.length);
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      if (isSyncMode && onSync) {
         const passphrase = query.trim();
         if (passphrase) {
           onSync(passphrase);
@@ -273,6 +257,32 @@ export function CommandPalette({
         }
         return;
       }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsSyncMode(false);
+        setQuery("");
+        setHighlightedIndex(0);
+        return;
+      }
+      // Allow all other keys to be typed normally in sync mode
+      return;
+    }
+
+    // Normal command palette mode - no shortcut matching while typing
+    // Only handle navigation and selection keys
+    const inputValue = (event.currentTarget as HTMLInputElement).value;
+    const hasSearchText = inputValue.trim().length > 0;
+    
+    if (!items.length) return;
+    
+    if (event.key === "ArrowDown" || (event.key === "j" && hasSearchText)) {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % items.length);
+    } else if (event.key === "ArrowUp" || (event.key === "k" && hasSearchText)) {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + items.length) % items.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
       const item = items[highlightedIndex];
       if (item) {
         handleRun(item as CommandItem | Note);
@@ -290,19 +300,25 @@ export function CommandPalette({
             <Command className="h-4 w-4 text-muted-foreground" />
             <input
               autoFocus
+              type={isSyncMode ? "password" : "text"}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
                 setHighlightedIndex(0);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Type a command or search notes…"
+              placeholder={isSyncMode ? "Enter passphrase and press Enter…" : "Type a command or search notes…"}
               className="flex-1 bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none border-none focus:outline-none focus:ring-0"
             />
           </div>
         </div>
         <div className="max-h-96 overflow-y-auto py-2">
-          {items.length === 0 ? (
+          {isSyncMode ? (
+            <div className="px-4 py-8 text-center">
+              <p className="text-sm text-muted-foreground">Enter your sync passphrase</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">Press Enter to sync or Escape to cancel</p>
+            </div>
+          ) : items.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <p className="text-sm text-muted-foreground">No results found</p>
               <p className="mt-1 text-xs text-muted-foreground/70">Try a different search term</p>

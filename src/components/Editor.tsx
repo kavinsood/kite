@@ -55,12 +55,11 @@ class HideSyntaxWidget extends WidgetType {
 
   toDOM() {
     const span = document.createElement("span");
-    // Use a zero‑width inline block so the cursor position stays correct
-    // without rendering the markdown syntax or creating a phantom line.
-    span.style.display = "inline-block";
-    span.style.width = "0";
-    span.style.height = "0";
-    span.style.overflow = "hidden";
+    // Use a zero-width space character to maintain cursor position
+    // without affecting layout or creating phantom cursors
+    span.textContent = "\u200B"; // Zero-width space
+    span.style.color = "transparent";
+    span.style.fontSize = "0";
     return span;
   }
 
@@ -145,12 +144,13 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
                 contentTo = nodeTo;
               }
               if (markerTo > markerFrom) {
+                // Use mark instead of replace to hide syntax with CSS
+                // This preserves cursor positions and prevents phantom cursors
                 builder.add(
                   markerFrom,
                   markerTo,
-                  Decoration.replace({
-                    widget: new HideSyntaxWidget(),
-                    inclusive: false,
+                  Decoration.mark({
+                    class: "cm-hidden-syntax",
                   })
                 );
               }
@@ -186,11 +186,13 @@ const markdownRenderPlugin = ViewPlugin.fromClass(
                 builder.add(nodeFrom, contentFrom, Decoration.replace({
                   widget: new HideSyntaxWidget(),
                   inclusive: false,
+                  block: false,
                 }));
 
                 builder.add(contentTo, nodeTo, Decoration.replace({
                   widget: new HideSyntaxWidget(),
                   inclusive: false,
+                  block: false,
                 }));
 
                 if (contentTo > contentFrom) {

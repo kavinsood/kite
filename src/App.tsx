@@ -481,6 +481,18 @@ function App() {
     }
   };
 
+  const handleDisableSync = () => {
+    // Disable sync but preserve all local notes
+    // Notes are stored in localStorage with keys like "note:${id}" and "noteMeta:${id}:updatedAt"
+    // which are NOT touched here - only the sync configuration is cleared
+    setBucketId(null);
+    setIsSynced(false);
+    window.localStorage.removeItem(BUCKET_ID_KEY);
+    window.localStorage.setItem(IS_SYNCED_KEY, "false");
+    // Refetch will call getLocalNotes() which reads from localStorage, preserving all notes
+    void refetchNotes();
+  };
+
   useShortcuts({
     activeId,
     orderedNotes,
@@ -640,6 +652,8 @@ function App() {
         onTogglePin={handleTogglePin}
         onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
         onSync={handleSync}
+        isSynced={isSynced}
+        onDisableSync={handleDisableSync}
       />
       <SearchIndexSync activeId={activeId} content={content} />
     </SidebarLayout>
