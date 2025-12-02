@@ -55,7 +55,12 @@ class HideSyntaxWidget extends WidgetType {
 
   toDOM() {
     const span = document.createElement("span");
-    span.className = "hidden";
+    // Use a zero‑width inline block so the cursor position stays correct
+    // without rendering the markdown syntax or creating a phantom line.
+    span.style.display = "inline-block";
+    span.style.width = "0";
+    span.style.height = "0";
+    span.style.overflow = "hidden";
     return span;
   }
 
