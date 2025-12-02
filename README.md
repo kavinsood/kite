@@ -1,425 +1,442 @@
-# Kite - TipTap Editor Codebase Reference
-
-## Overview
-
-**Kite** is a modern, feature-rich rich-text editor built with React, TypeScript, and TipTap. It's designed for deployment on Cloudflare Workers with a comprehensive component architecture, local persistence features, and extensible editor functionality.
-
-## 🏗️ Project Architecture
-
-### Core Stack
-- **Frontend**: React 19 + TypeScript + Vite
-- **Editor**: TipTap (ProseMirror-based)
-- **Styling**: SCSS with CSS custom properties
-- **Deployment**: Cloudflare Workers
-- **Package Manager**: pnpm ([memory reference][[memory:7050670888353255928]])
-
-### Build & Deployment
-```bash
-# Development
-pnpm dev
-
-# Build
-pnpm build
-
-# Deploy to Cloudflare
-pnpm deploy
-
-# Linting
-pnpm lint
-```
-
-## 📁 Directory Structure
-
-```
-kite/
-├── @/                           # Source code with path alias
-│   ├── components/              # All React components
-│   │   ├── tiptap-extension/    # Custom TipTap extensions
-│   │   ├── tiptap-icons/        # SVG icon components
-│   │   ├── tiptap-node/         # Custom node implementations
-│   │   ├── tiptap-templates/    # Complete editor templates
-│   │   ├── tiptap-ui/           # Editor UI components
-│   │   └── tiptap-ui-primitive/ # Base UI primitives
-│   ├── hooks/                   # Custom React hooks
-│   ├── lib/                     # Utility functions
-│   └── styles/                  # Global SCSS styles
-├── src/                         # App entry point
-├── worker/                      # Cloudflare Worker code
-└── public/                      # Static assets
-```
-
-## 🧩 Component Architecture
-
-### 1. TipTap Extensions (`@/components/tiptap-extension/`)
-
-#### Link Extension (`link-extension.ts`)
-- **Purpose**: Enhanced link handling with click selection and keyboard navigation
-- **Features**: 
-  - Escape key handling for link selection
-  - Auto-selection on link click
-  - Safe URL parsing (excludes javascript: URLs)
-
-#### Selection Extension (`selection-extension.ts`)
-- **Purpose**: Enhanced text selection behaviors
-- **Features**: Custom selection handling and state management
-
-#### Trailing Node Extension (`trailing-node-extension.ts`)
-- **Purpose**: Ensures editor always has a trailing paragraph node
-- **Features**: Automatic node insertion at document end
-
-### 2. TipTap UI Primitives (`@/components/tiptap-ui-primitive/`)
-
-#### Button (`button/`)
-- **Core Component**: `button.tsx`
-- **Features**:
-  - Tooltip integration with delay
-  - Keyboard shortcut display (platform-aware)
-  - Multiple style variants via `data-style` attribute
-  - Accessibility support
-- **Styling**: `button.scss`, `button-colors.scss`, `button-group.scss`
-
-#### Toolbar (`toolbar/`)
-- **Components**: `toolbar.tsx`, toolbar groups, separators
-- **Features**: Responsive toolbar layout with grouping
-
-#### Other Primitives
-- **Dropdown Menu**: Custom dropdown with positioning
-- **Popover**: Floating UI-based popover component
-- **Separator**: Visual separators for UI organization
-- **Spacer**: Flexible spacing component
-- **Tooltip**: Accessible tooltip implementation
-
-### 3. TipTap UI Components (`@/components/tiptap-ui/`)
-
-#### Mark Button (`mark-button/`)
-- **Purpose**: Toggles text formatting (bold, italic, etc.)
-- **Supported Marks**: bold, italic, strike, code, underline, superscript, subscript
-- **Features**:
-  - Schema validation
-  - Keyboard shortcuts
-  - Active state management
-  - Conditional visibility
-
-#### Heading Components
-- **HeadingDropdownMenu**: Level selection (H1-H6)
-- **HeadingButton**: Individual heading toggle
-
-#### List Components
-- **ListDropdownMenu**: List type selection (bullet, ordered, task)
-- **ListButton**: Individual list toggle
-
-#### Special Components
-- **ColorHighlightPopover**: Text highlighting with color picker
-- **LinkPopover**: Link insertion/editing interface
-
-- **UndoRedoButton**: History navigation
-
-#### Persistence Components
-- **PersistenceControls**: Manual save/load/clear buttons
-- **PersistenceIndicator**: Shows save status with timestamps
-
-### 4. TipTap Nodes (`@/components/tiptap-node/`)
-
-#### Custom Image Node (`image-node/`)
-- **Component**: `image-node.tsx` - React component with loading and error states
-- **Extension**: `image-node-extension.ts` - Custom TipTap extension
-- **Features**:
-  - Loading spinner while images load
-  - Error handling with user-friendly error messages
-  - Better keyboard navigation (Enter/Arrow keys)
-  - Automatic paragraph insertion after images
-  - No selection issues when clicking near images
-
-#### Auto Image Extension (`auto-image-extension.ts`)
-- **Purpose**: Automatically converts image URLs to image nodes with enhanced UX
-- **Features**:
-  - Paste URL detection for common image formats (png, jpg, gif, webp, etc.)
-  - Instant image rendering from URLs with loading states
-  - No local storage consumption
-  - Supports query parameters in URLs
-  - Works seamlessly with custom Image Node component
-
-#### Other Nodes
-- **Code Block**: Syntax-highlighted code blocks
-- **List Node**: Enhanced list rendering
-- **Image Node**: Basic image handling
-- **Paragraph Node**: Enhanced paragraph styling
-
-### 5. Templates (`@/components/tiptap-templates/`)
-
-#### Simple Editor (`simple/`)
-- **Main Component**: `simple-editor.tsx`
-- **Features**:
-  - Complete editor setup
-  - Mobile-responsive toolbar
-  - Theme toggle support
-  - Persistence integration
-  - All formatting options
-
-## 🪝 Custom Hooks (`@/hooks/`)
-
-### Core Editor Hook
-#### `use-tiptap-editor.ts`
-- **Purpose**: Provides access to editor instance from context or prop
-- **Usage**: Consistent editor access across components
-
-### Persistence Hook
-#### `use-editor-persistence.ts`
-- **Purpose**: Automatic content persistence to localStorage
-- **Features**:
-  - Auto-save with debouncing (1s default)
-  - Manual save/load/clear operations
-  - Status tracking (saving, saved, unsaved)
-  - Error handling
-  - Timestamp tracking
-- **Configuration**:
-  ```typescript
-  {
-    storageKey?: string          // localStorage key
-    debounceMs?: number         // Auto-save delay (1000ms)
-    autoSave?: boolean          // Enable auto-save (true)
-    onSave?: (content) => void  // Save callback
-    onLoad?: (content) => void  // Load callback
-    onError?: (error) => void   // Error callback
-  }
-  ```
-
-### UI Hooks
-#### `use-mobile.ts`
-- **Purpose**: Detects mobile viewport
-- **Breakpoint**: 768px
-
-#### `use-window-size.ts`
-- **Purpose**: Tracks window dimensions
-- **Features**: Debounced resize handling
-
-#### `use-cursor-visibility.ts`
-- **Purpose**: Manages cursor visibility states
-- **Features**: Focus/blur tracking, selection monitoring
-
-#### `use-menu-navigation.ts`
-- **Purpose**: Keyboard navigation for dropdown menus
-- **Features**: Arrow key navigation, escape handling
-
-#### `use-focus-mode.ts`
-- **Purpose**: Creates a distraction-free writing experience by fading out the toolbar when the user is typing.
-- **Behavior**:
-  - **Activation**: Focus mode is triggered automatically after a brief period of typing (`enterFocusDelay`).
-  - **Typing**: While actively typing, the toolbar is forced to be hidden, regardless of mouse position. The fade-out is a long, smooth transition to feel elegant.
-  - **Reveal**: Moving the mouse (even slightly) immediately cancels the "typing" state, allowing the toolbar to fade back into view based on a hover state.
-  - **Inactivity**: The "typing" state automatically ends after a configurable period of inactivity (`exitFocusDelay`), allowing the hover-to-reveal behavior to resume. Focus mode itself remains active.
-  - **Manual Exit**: Pressing `Escape` or `Cmd/Ctrl+/` will fully exit focus mode. It also exits automatically if the editor loses focus.
-- **Features**:
-  - Auto-detects typing via editor `update` events.
-  - Distinguishes between active typing and mouse hover to control toolbar visibility.
-  - Configurable enter/exit delays.
-  - Mobile-aware (disabled on mobile viewports).
-  - Manual state controls for programmatic use.
-- **Configuration**:
-  ```typescript
-  {
-    editor: Editor | null         // TipTap editor instance
-    enterFocusDelay?: number     // Delay before fade-out begins (e.g., 100ms)
-    exitFocusDelay?: number      // Delay to reset typing status after inactivity (e.g., 3000ms)
-    enabled?: boolean            // Enable/disable focus mode (true)
-  }
-  ```
-
-## 🛠️ Utilities (`@/lib/`)
-
-### TipTap Utils (`tiptap-utils.ts`)
-
-#### Schema Validation
-```typescript
-isMarkInSchema(markName: string, editor: Editor): boolean
-isNodeInSchema(nodeName: string, editor: Editor): boolean
-```
-
-#### Mark Operations
-```typescript
-getActiveMarkAttrs(editor: Editor, markName: string): Attrs | null
-```
-
-#### Node Utilities
-```typescript
-isEmptyNode(node?: Node): boolean
-findNodePosition({ editor, node?, nodePos? }): { pos: number; node: Node } | null
-```
-
-
-
-#### CSS Utilities
-```typescript
-cn(...classes): string  // Conditional class names
-```
-
-## 🎨 Styling System (`@/styles/`)
-
-### Variables (`_variables.scss`)
-- **Color System**: Light/dark mode with alpha variants
-- **Brand Colors**: Purple-based brand palette
-- **Semantic Colors**: Green, yellow, red for status
-- **Spacing**: Consistent radius and spacing scales
-- **Transitions**: Predefined easing and durations
-- **Shadows**: Elevation system
-
-### Theme Support
-- **Light Mode**: Default theme with light background
-- **Dark Mode**: Dark theme activated via `.dark` class
-- **CSS Custom Properties**: Dynamic theming support
-
-### Animations (`_keyframe-animations.scss`)
-- **Loading Animations**: Spinner, pulse effects
-- **Transition Effects**: Smooth state changes
-
-## 🔧 Configuration Files
-
-### TypeScript Configuration
-- **tsconfig.json**: Base TypeScript config
-- **tsconfig.app.json**: App-specific settings
-- **tsconfig.node.json**: Node.js compatibility
-- **tsconfig.worker.json**: Worker-specific types
-
-### Build Configuration
-#### Vite (`vite.config.ts`)
-- **Plugins**: React, Cloudflare integration
-- **Path Alias**: `@` mapped to `./@`
-- **Build Optimization**: Production optimizations
-
-#### Cloudflare (`wrangler.jsonc`)
-- **Worker Configuration**: Entry point, compatibility date
-- **Assets**: SPA routing support
-- **Observability**: Monitoring enabled
-
-### Linting ([memory reference][[memory:442055615282021518]])
-#### ESLint (`eslint.config.js`)
-- **Plugins**: react-hooks, react-refresh, react-x, react-dom
-- **Configuration**: Recommended rules for all plugins
-- **TypeScript Support**: Full TypeScript integration
-
-### Package Management
-#### `package.json`
-- **Dependencies**: TipTap ecosystem, React 19, utility libraries
-- **DevDependencies**: Build tools, linting, TypeScript
-- **Scripts**: Development, build, deploy, lint workflows
-
-## 🚀 Features
-
-### Editor Capabilities
-- **Rich Text Formatting**: Bold, italic, underline, strikethrough, code
-- **Headings**: H1-H6 with dropdown selection
-- **Lists**: Bullet, ordered, task lists
-- **Blocks**: Blockquotes, code blocks
-- **Media**: URL-based image rendering (paste image URLs to display images)
-- **Links**: Enhanced link handling with popover editor
-
-- **Typography**: Subscript, superscript, highlighting
-- **History**: Undo/redo functionality
-
-### Persistence Features ([Detailed in PERSISTENCE_FEATURES.md])
-- **Auto-save**: 1-second debounced automatic saving
-- **Manual Controls**: Save, load, clear buttons
-- **Status Indicator**: Real-time save status with timestamps
-- **Local Storage**: Browser-based content persistence
-- **Error Handling**: Graceful localStorage failure handling
-
-### Responsive Design
-- **Mobile Support**: Adaptive toolbar for mobile devices
-- **Touch Optimization**: Touch-friendly controls
-- **Responsive Layout**: Flexible editor sizing
-
-### Accessibility
-- **Keyboard Navigation**: Full keyboard support
-- **ARIA Labels**: Comprehensive accessibility labels
-- **Focus Management**: Proper focus handling
-- **Screen Reader Support**: Semantic markup
-
-## 🔄 Cloudflare Worker
-
-### Worker Entry (`worker/index.ts`)
-- **API Routes**: `/api/*` endpoint handling
-- **Static Assets**: SPA fallback support
-- **Simple API**: Basic JSON response example
-
-### Deployment
-```bash
-pnpm deploy  # Build and deploy to Cloudflare
-```
-
-## 📋 Development Guidelines
-
-### Component Structure
-1. **Imports**: Group by category (React, TipTap, custom)
-2. **Types**: Define interfaces before components
-3. **Hooks**: Custom hooks before component logic
-4. **Exports**: Named exports with default export
-
-### Styling Conventions
-1. **SCSS Modules**: Component-specific styles
-2. **CSS Variables**: Use design tokens
-3. **Class Naming**: BEM-inspired with `tiptap-` prefix
-4. **Responsive**: Mobile-first approach
-
-### State Management
-1. **Local State**: React useState for component state
-2. **Context**: Editor context for shared state
-3. **Persistence**: localStorage for content persistence
-4. **No External State**: No Redux/Zustand needed
-
-## 🧪 Testing & Quality
-
-### Linting
-- **ESLint**: React, TypeScript, accessibility rules
-- **Prettier**: Code formatting (via ESLint integration)
-
-### Type Safety
-- **Strict TypeScript**: Full type checking enabled
-- **Editor Types**: TipTap type definitions
-- **Worker Types**: Cloudflare Worker types
-
-## 📚 Key Dependencies
-
-### Core Dependencies
-- **@tiptap/react**: TipTap React integration
-- **@tiptap/starter-kit**: Essential TipTap extensions
-- **@tiptap/extension-***: Individual TipTap extensions
-- **@floating-ui/react**: Popover positioning
-- **tiptap-markdown**: Markdown support
-
-### Development Dependencies
-- **@vitejs/plugin-react**: React Vite integration
-- **@cloudflare/vite-plugin**: Cloudflare deployment
-- **sass-embedded**: SCSS compilation
-- **typescript-eslint**: TypeScript ESLint integration
-
-## 🎯 Usage Examples
-
-### Basic Editor Setup
-```tsx
-import { SimpleEditor } from '@/components/tiptap-templates/simple/simple-editor'
-
-function App() {
-  return <SimpleEditor />
+## README
+
+### Overview
+
+This repo is a **minimal, zero-friction markdown scratchpad**:
+
+- **No login, no landing page, no ads, no onboarding.**
+- You hit the URL and are **immediately in a markdown editor**.
+- Notes are stored in **Cloudflare KV** behind a **single Worker**, with optional protection via **Cloudflare Access / Zero Trust** (outside the app).
+
+The entire design is intentionally **boring** and **obvious** so it can run for years with minimal maintenance.
+
+---
+
+## Architecture
+
+### Frontend
+
+- **Framework**: React + Vite.
+- **Editor**: `@uiw/react-codemirror` with markdown language support, configured as a minimal, full-height text area (no gutter, no line numbers).
+- **Styling**: Tailwind CSS (via PostCSS), dark theme only:
+  - `bg` / `sidebar` / `border` / `text` / `muted` / `accent` colors defined in `tailwind.config.ts`.
+- **Layout**:
+  - Left **sidebar** listing notes (title + updated time).
+  - Right **editor pane** for a single active note.
+  - Thin **status bar** at the top of the editor showing save status / recovered draft / delete.
+
+### Backend
+
+- **Runtime**: Cloudflare Worker (configured as the `main` entry).
+- **Storage**: Cloudflare KV:
+  - Binding name: `KV` (configured in `wrangler.jsonc` and `worker-configuration.d.ts`).
+- **Static assets**:
+  - Bound as `ASSETS`, served via `env.ASSETS.fetch(request)` for all non-`/api/*` routes.
+  - Wrangler is configured with SPA-style not-found handling so `/n/<id>` routes serve `index.html`.
+
+The Worker is both:
+
+- **API** for notes (`/api/*`).
+- **Router** for the SPA frontend (falls through to `env.ASSETS.fetch` for everything else).
+
+---
+
+## Data Model
+
+### KV Schema
+
+- **Key**: `id: string` – a UUID v4 (opaque, unguessable).
+- **Value**: `content: string` – raw markdown text.
+- **Metadata**:
+
+```ts
+{
+  title: string;      // Derived from first line, first 20 chars, fallback "Untitled"
+  updatedAt: number;  // Unix timestamp (ms since epoch)
+  deleted?: boolean;  // Soft delete flag
 }
 ```
 
-### Custom Component Integration
-```tsx
-import { MarkButton } from '@/components/tiptap-ui/mark-button'
+There is **no additional structure** (no tags, folders, or relational modeling).
 
-// Bold button with custom styling
-<MarkButton type="bold" className="custom-bold" />
+---
+
+## API
+
+All API routes live under `/api/*` and are implemented inside the Worker.
+
+### 1. `GET /api/notes`
+
+- **Purpose**: List notes for the sidebar (lightweight, metadata only).
+- **Behavior**:
+  - Iteratively calls `env.KV.list({ cursor })` to collect **all** keys (handles pagination; does not silently stop at 1000).
+  - For each key, reads metadata and builds:
+    - `{ id, title, updatedAt }`.
+  - Filters out notes with `metadata.deleted === true`.
+  - Sorts the array by `updatedAt` descending on the server.
+- **Response**:
+
+```ts
+Array<{
+  id: string;
+  title: string;
+  updatedAt: number;
+}>
 ```
 
-### Persistence Hook Usage
-```tsx
-import { useEditorPersistence } from '@/hooks/use-editor-persistence'
+### 2. `GET /api/note/:id`
 
-const { save, load, clear, isSaving, lastSaved } = useEditorPersistence(editor, {
-  storageKey: 'my-editor-content',
-  debounceMs: 2000,
-  onSave: (content) => console.log('Saved:', content)
-})
+- **Purpose**: Fetch a single note’s full content.
+- **Behavior**:
+  - Uses `env.KV.getWithMetadata<NoteMetadata>(id)`.
+  - If value is `null` or `metadata.deleted === true`, returns **404**.
+- **Response** (200):
+
+```ts
+{
+  id: string;
+  content: string;
+  updatedAt: number;
+  deleted?: boolean;
+}
 ```
 
-This reference document provides a complete overview of the Kite TipTap editor codebase. Each component, hook, and utility is designed to work together to create a powerful, extensible rich-text editing experience. 
+### 3. `POST /api/save`
+
+- **Input**:
+
+```json
+{
+  "id": "uuid",
+  "content": "markdown text"
+}
+```
+
+- **Behavior**:
+  - Validates that both `id` and `content` are strings.
+  - Derives `title` from `content` server-side:
+    - First line only.
+    - Strips leading `#` and whitespace.
+    - Truncates to 20 chars.
+    - Fallback `"Untitled"`.
+  - Calls `env.KV.getWithMetadata` first to preserve any existing `deleted` flag.
+  - Writes with:
+
+```ts
+env.KV.put(id, content, {
+  metadata: {
+    title,
+    updatedAt: Date.now(),
+    deleted: existing.metadata?.deleted ?? false
+  }
+});
+```
+
+- **Response**:
+
+```json
+{
+  "success": true,
+  "updatedAt": 1730000000000
+}
+```
+
+### 4. `POST /api/delete`
+
+- **Input**:
+
+```json
+{
+  "id": "uuid"
+}
+```
+
+- **Behavior**:
+  - Reads the current value and metadata via `getWithMetadata`.
+  - If value is `null`, returns `{ success: true }` (idempotent, no error).
+  - Otherwise, **re-writes the same value** with metadata `{ ...metadata, deleted: true }`.
+- **Response**:
+
+```json
+{
+  "success": true
+}
+```
+
+No actual KV keys are deleted; this is **soft delete** only.
+
+---
+
+## Client Behavior & State Machine
+
+### Storage hierarchy
+
+- **L1 (in-memory)**: React state – `notes`, `activeId`, `content`, flags.
+- **L2 (local resilience)**: `localStorage`:
+  - Per-note drafts: `draft:<id>`.
+  - Last open note: `lastActiveNoteId`.
+- **L3 (persistence)**: Cloudflare KV.
+
+### State in `App.tsx`
+
+- **State**:
+  - `notes: Note[]` – from `GET /api/notes`.
+  - `activeId: string | null` – currently open note id.
+  - `content: string` – current editor markdown content.
+  - `isPersisted: boolean` – has this id ever been successfully saved to KV.
+  - `status: 'saving' | 'saved' | 'error' | ''` – tiny status indicator.
+  - `recovered: boolean` – whether a local draft was used to override server content.
+
+---
+
+### Boot sequence (on mount)
+
+1. **Fetch sidebar notes**:
+   - Call `GET /api/notes`, populate `notes`.
+   - If it fails, show an empty list but still allow local drafts.
+
+2. **Determine `activeId`** with this priority:
+
+   1. If `window.location.pathname` is `/n/<uuid>`, use that `uuid`.
+   2. Else read `localStorage.lastActiveNoteId`:
+      - If present, set as `activeId` and `history.replaceState` to `/n/<id>`.
+   3. Else:
+      - Generate `uuid` with `uuidv4()`.
+      - Set as `activeId`.
+      - `history.replaceState` to `/n/<id>`.
+
+3. **Persist choice**:
+   - `localStorage.setItem('lastActiveNoteId', id)`.
+
+At this point there may be **no server data** for the chosen id—this is the **“ghost note”** case.
+
+---
+
+### Load sequence (when `activeId` changes)
+
+Whenever `activeId` changes:
+
+1. Update URL:
+   - `history.replaceState(null, '', '/n/' + activeId)`.
+   - Update `lastActiveNoteId` in `localStorage`.
+
+2. Load local draft:
+   - `const localDraft = localStorage.getItem('draft:<activeId>')`.
+
+3. Fetch server content:
+   - `GET /api/note/:id`.
+
+4. **Conflict resolution**:
+
+   - **If 404**:
+     - If `localDraft` exists → use `localDraft`, `isPersisted = false`.
+     - Else → `content = ''`, `isPersisted = false` (new, empty ghost note).
+
+   - **If 200**:
+     - If `localDraft` exists **and** `localDraft !== api.content`:
+       - Prefer `localDraft`.
+       - Set `recovered = true`.
+       - Set `isPersisted = true` (the note exists in KV; the draft is “newer” but we still treat it as an existing note id).
+     - Else:
+       - Use `api.content`.
+       - `isPersisted = true`.
+
+   - **If network error**:
+     - If `localDraft` exists → use it; `isPersisted = false`.
+     - Else → `content = ''`; `isPersisted = false`.
+
+This obeys the **“never trust the network over the user’s local input”** rule.
+
+---
+
+### Change handling and drafts
+
+On every editor change:
+
+- Update `content` state.
+- If `activeId` exists, immediately:
+  - `localStorage.setItem('draft:<activeId>', content)`.
+
+This ensures that:
+
+- A tab close / crash / network drop still leaves a recoverable draft.
+- Recover logic above can override KV content if drafts differ.
+
+---
+
+### Debounced save (no empty-note spam)
+
+A custom `useDebouncedEffect` hook is used to debounce saves by **1000 ms** after typing stops:
+
+```ts
+useDebouncedEffect(
+  () => {
+    if (!activeId) return;
+
+    const trimmed = content.trim();
+
+    // 1. Fully empty + never saved: do nothing (don't spam KV).
+    if (trimmed === "" && !isPersisted) {
+      setStatus("");
+      return;
+    }
+
+    // 2. Otherwise, save (including "clearing" real notes to empty).
+    setStatus("saving");
+    // POST /api/save ...
+  },
+  1000,
+  [content, activeId, isPersisted],
+);
+```
+
+Rules:
+
+- **New note + empty content + never persisted**:
+  - **No save**. KV stays clean.
+- **Existing note + cleared content (`''`)**:
+  - Save the empty content. The user truly wanted to delete the text.
+- **Non-empty content**:
+  - Debounced save to `/api/save`.
+  - On success:
+    - Update `notes` list (derive title client-side for instant UI).
+    - Sort notes by `updatedAt` desc.
+    - Set `isPersisted = true`, `status = 'saved'`.
+    - Clear `draft:<id>` from `localStorage`.
+
+On save error, `status` is set to `"error"`, but **content and drafts are never discarded**.
+
+---
+
+### Delete behavior (soft delete, no trash UI)
+
+- Delete button is a small text control in the top-right status bar of the editor.
+- On click:
+  - Call `POST /api/delete` with `{ id: activeId }`.
+  - On success:
+    - Remove the note from `notes` state.
+    - Remove `draft:<id>` from `localStorage`.
+    - If `lastActiveNoteId` matches this id, clear or overwrite it.
+    - Pick the next active note:
+      - If other notes exist → the first in sorted `notes`.
+      - Otherwise → create a new ghost note id and switch to it.
+
+There is **no Trash view** yet; deleted notes simply stop appearing in the sidebar while still existing in KV.
+
+---
+
+## Worker Routing & SPA Behavior
+
+Because `wrangler.jsonc` sets:
+
+```json
+{
+  "main": "worker/index.ts",
+  "assets": {
+    "not_found_handling": "single-page-application"
+  }
+}
+```
+
+the Worker is responsible for **both** API and frontend.
+
+To avoid breaking hard refreshes on `/n/:id`:
+
+- The Worker now:
+
+  - Handles **only** `/api/*` in custom logic.
+  - For everything else, calls `env.ASSETS.fetch(request)` so that the built React app is served.
+  - Unknown API endpoints return a proper `404` with `"API endpoint not found"`.
+
+This ensures:
+
+- `GET /n/<uuid>` → `index.html` + SPA boot, not a naked 404.
+- Browser refresh on a note page works seamlessly.
+
+---
+
+## Running Locally
+
+### Prerequisites
+
+- Node.js + pnpm.
+- Wrangler installed (for deploys / types): `pnpm dlx wrangler --help`.
+
+### Install
+
+```bash
+pnpm install
+```
+
+### Dev (frontend + worker)
+
+For local development with the current setup:
+
+```bash
+pnpm dev
+```
+
+- Vite dev server serves the React app.
+- When using Wrangler’s worker dev flow, ensure your KV binding and `ASSETS` are configured as in `wrangler.jsonc`.
+
+### Build
+
+```bash
+pnpm run build
+```
+
+- Runs TypeScript build + Vite build for both the Worker bundle and the client bundle.
+
+### Deploy
+
+```bash
+pnpm run deploy
+```
+
+- Uses `wrangler deploy` with `main: "worker/index.ts"`.
+- After deploy, you can gate the URL with **Cloudflare Access** for private use; the app itself remains unaware of any authentication.
+
+---
+
+## Design Philosophy (From the Conversation)
+
+Key intentional decisions made during this build:
+
+- **No login, no landing, no multi-user semantics**:
+  - If you can open the URL, you are “logged in”.
+  - Auth is handled entirely by Cloudflare Access, not app code.
+
+- **Single, boring storage model**:
+  - KV key = id, value = markdown, metadata = `{ title, updatedAt, deleted }`.
+  - No attempts to model folders, tags, or complex relationships.
+
+- **Soft delete over hard delete**:
+  - Users eventually delete the wrong thing; disks are cheap.
+  - A single `deleted: true` flag prevents UI clutter without losing data.
+
+- **No empty-note spam**:
+  - Creating a new note only allocates a UUID and updates the URL.
+  - KV is not touched until there is actual, non-empty content OR a real note is cleared.
+
+- **Local drafts > network**:
+  - On conflict, local drafts override server content.
+  - Offline creation and save failures do not lose user text.
+
+- **Explicit pagination handling**:
+  - KV `list()` was initially naïvely called once.
+  - Now loops with `cursor` until `list_complete` to avoid truncating the sidebar at 1000 notes.
+
+- **Minimal coupling, acceptable duplication**:
+  - Title derivation exists in both client (for instant UI) and server (for canonical metadata).
+  - This is a pragmatic trade-off between “pure DRY” and latency/user experience.
+
+---
+
+## What This App Is Not
+
+- **Not** a note-taking platform with accounts, teams, or sharing.
+- **Not** a WYSIWYG editor; it’s raw markdown text.
+- **Not** an AI product; no summarization, tagging, or smart features.
+- **Not** a framework playground; it uses React, CodeMirror, and Tailwind in the most straightforward way possible.
+
+It’s a **scratchpad**: open browser → type → close tab → come back later → it’s still there.

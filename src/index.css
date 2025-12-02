@@ -1,69 +1,233 @@
-@import '../@/styles/_variables.scss';
-@import '../@/styles/_keyframe-animations.scss';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Enable SF Pro font smoothing */
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
+@layer base {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --radius: 0.5rem;
+    --focus-ring: 2px solid #e2a727;
+    /* Legacy support - map to new system */
+    --bg: hsl(var(--background));
+    --sidebar: hsl(var(--muted));
+    --text: hsl(var(--foreground));
+    --highlight: #fef3c7;
+    --highlight-text: #92400e;
   }
-  a:hover {
-    color: #747bff;
+
+  .dark {
+    --background: 0 0% 12%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    /* Legacy support - map to new system */
+    --bg: hsl(var(--background));
+    --sidebar: hsl(var(--muted));
+    --text: hsl(var(--foreground));
+    --highlight: #78350f;
+    --highlight-text: #fef3c7;
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+/* CodeMirror editor theme-aware styling */
+.cm-editor {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.cm-editor .cm-scroller {
+  overflow: auto;
+}
+
+.cm-editor .cm-content {
+  padding: 1.5rem 1.75rem;
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.cm-editor.cm-focused .cm-cursor {
+  border-left-color: #e2a727;
+}
+
+.cm-editor .cm-selectionBackground,
+.cm-editor.cm-focused .cm-selectionBackground,
+.cm-editor ::selection {
+  background-color: hsl(var(--border));
+}
+
+/* Markdown rendering - hide syntax characters */
+.cm-editor .hidden {
+  display: none;
+}
+
+/* Markdown styling */
+.cm-markdown-heading {
+  display: block;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.cm-markdown-bold {
+  font-weight: 600;
+}
+
+.cm-markdown-italic {
+  font-style: italic;
+}
+
+.cm-markdown-strikethrough {
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+/* Context Menu Styles */
+[data-radix-context-menu-content] {
+  z-index: 50;
+  animation: none !important;
+  transform: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}
+
+[data-radix-context-menu-content][data-state="open"] {
+  animation: none !important;
+  transform: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}
+
+[data-radix-context-menu-content][data-side] {
+  animation: none !important;
+  transform: none !important;
+}
+
+[data-radix-context-menu-item] {
+  outline: none;
+}
+
+/* Smooth transitions and animations */
+* {
+  transition-property: color, background-color, border-color, opacity, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Focus states */
+*:focus-visible {
+  outline: var(--focus-ring);
+  border-radius: 6px;
+}
+
+/* Global caret styling */
+* {
+  caret-color: #e2a727;
+}
+
+/* Keyboard navigation visual feedback */
+[data-highlighted="true"] {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  /* Touch-friendly UI elements */
+  button,
+  a,
+  input,
+  textarea {
+    min-height: 44px; /* Apple's recommended touch target size */
+    min-width: 44px;
+  }
+
+  /* Prevent text size adjustment on iOS */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* Better spacing for mobile */
+  .cm-editor .cm-content {
+    padding: 1rem 1.25rem;
+  }
+
+  /* Prevent double-tap zoom */
+  * {
+    touch-action: manipulation;
+  }
+}
+
+/* Touch manipulation for better performance */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Mobile keyboard handling - prevent zoom on input focus */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"],
+  input[type="search"],
+  textarea {
+    font-size: 16px !important;
   }
 }

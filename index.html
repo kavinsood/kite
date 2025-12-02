@@ -1,48 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" suppressHydrationWarning>
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0e0e11" media="(prefers-color-scheme: dark)" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Kite</title>
-    
-    <script>
-      // Prevent white flash by applying dark mode immediately
-      (function() {
-        // Helper to apply theme classes & bg colour
-        const applyTheme = (isDark) => {
-          document.documentElement.classList.toggle('dark', isDark)
-          document.body.classList.toggle('dark', isDark)
-          // Sync background colour to avoid flash between navigations
-          document.documentElement.style.backgroundColor = isDark ? '#0e0e11' : '#ffffff'
-        }
-
-        // Check for saved theme preference or default to system preference
-        const savedTheme = localStorage.getItem('theme')
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-        const prefersDark = mediaQuery.matches
-        const shouldUseDark = savedTheme === 'dark' || (!savedTheme && prefersDark)
-
-        // Apply on initial load
-        applyTheme(shouldUseDark)
-
-        // Watch for changes to the system theme **if the user has not explicitly chosen a theme**
-        const handleChange = (e) => {
-          // Bail if user has an explicit preference stored
-          if (localStorage.getItem('theme')) return
-          applyTheme(e.matches)
-        }
-
-        if (mediaQuery.addEventListener) {
-          mediaQuery.addEventListener('change', handleChange)
-        } else if (mediaQuery.addListener) { // Legacy browsers
-          mediaQuery.addListener(handleChange)
-        }
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>
