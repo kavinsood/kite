@@ -254,18 +254,22 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
   };
 
   const updateLocalNoteFromContent = (id: string, content: string) => {
-    const now = Date.now();
+    // Only update title and preview for display purposes
+    // Do NOT update updatedAt timestamp - that should only change when content is actually saved
     const title = deriveTitle(content);
     const preview = previewContent(content);
 
     queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
+      const existing = old.find((n) => n.id === id);
+      const updatedAt = existing?.updatedAt ?? Date.now(); // Preserve existing timestamp
       const others = old.filter((n) => n.id !== id);
-      return [{ id, title, updatedAt: now, preview }, ...others];
+      return [{ id, title, updatedAt, preview }, ...others];
     });
 
+    // Only update preview in localStorage, not the timestamp
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(`noteMeta:${id}:updatedAt`, String(now));
       window.localStorage.setItem(`noteMeta:${id}:preview`, preview);
+      // Don't touch noteMeta:${id}:updatedAt here - preserve the original timestamp
     }
   };
 
