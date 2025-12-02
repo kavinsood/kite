@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Note } from '../types';
 import { deriveTitle } from '../utils/title';
+import { previewContent } from '../utils/preview';
 import { getNoteContent, getDraftContent, deleteNoteContent, setNoteContent, getAllKeys } from '../utils/storage';
 
 type UseNotesOptions = {
@@ -41,11 +42,24 @@ async function getLocalNotes(): Promise<Note[]> {
   }
 
   return Array.from(notesById.entries())
-    .map(([id, { content, updatedAt }]) => ({
-      id,
-      title: deriveTitle(content),
-      updatedAt,
-    }))
+    .map(([id, { content, updatedAt }]) => {
+      const title = deriveTitle(content);
+      // Prefer cached preview if present, otherwise derive once and cache it.
+      let preview = window.localStorage.getItem(`noteMeta:${id}:preview`) ?? undefined;
+      if (!preview) {
+        preview = previewContent(content);
+        if (preview) {
+          window.localStorage.setItem(`noteMeta:${id}:preview`, preview);
+        }
+      }
+
+      return {
+        id,
+        title,
+        updatedAt,
+        preview,
+      };
+    })
     .filter((note) => note.title.trim().length > 0 || updatedAtIsMeaningful(note.updatedAt))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -98,13 +112,16 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
         const now = Date.now();
         queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
           const title = deriveTitle(content);
+          const preview = previewContent(content);
           const others = old.filter((n) => n.id !== id);
-          return [{ id, title, updatedAt: now }, ...others];
+          return [{ id, title, updatedAt: now, preview }, ...others];
         });
 
         // Persist basic metadata locally for ordering across reloads
         if (typeof window !== 'undefined') {
           window.localStorage.setItem(`noteMeta:${id}:updatedAt`, String(now));
+          const preview = previewContent(content);
+          window.localStorage.setItem(`noteMeta:${id}:preview`, preview);
         }
 
         return { success: true, updatedAt: now };
@@ -129,19 +146,21 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
           headers: { 'X-Bucket-Id': bucketId },
         });
         if (noteRes.ok) {
-          const full = (await noteRes.json()) as { content: string; updatedAt: number };
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(
-              `noteMeta:${id}:updatedAt`,
-              String(full.updatedAt),
-            );
-          }
-          await setNoteContent(id, full.content);
-          queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
-            const others = old.filter((n) => n.id !== id);
-            const title = deriveTitle(full.content);
-            return [{ id, title, updatedAt: full.updatedAt }, ...others];
-          });
+            const full = (await noteRes.json()) as { content: string; updatedAt: number };
+            const preview = previewContent(full.content);
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(
+                `noteMeta:${id}:updatedAt`,
+                String(full.updatedAt),
+              );
+              window.localStorage.setItem(`noteMeta:${id}:preview`, preview);
+            }
+            await setNoteContent(id, full.content);
+            queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
+              const others = old.filter((n) => n.id !== id);
+              const title = deriveTitle(full.content);
+              return [{ id, title, updatedAt: full.updatedAt, preview }, ...others];
+            });
         }
         throw new Error('Conflict saving note');
       }
@@ -161,9 +180,10 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
       const previousNotes = queryClient.getQueryData<Note[]>(['notes', bucketId, isSynced]);
       queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
         const title = deriveTitle(newNote.content);
+        const preview = previewContent(newNote.content);
         const now = Date.now();
         const otherNotes = old.filter((n) => n.id !== newNote.id);
-        return [{ id: newNote.id, title, updatedAt: now }, ...otherNotes];
+        return [{ id: newNote.id, title, updatedAt: now, preview }, ...otherNotes];
       });
 
       return { previousNotes };
@@ -179,12 +199,15 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
 
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(`noteMeta:${variables.id}:updatedAt`, String(updatedAt));
+        const preview = previewContent(variables.content);
+        window.localStorage.setItem(`noteMeta:${variables.id}:preview`, preview);
       }
 
       queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
         const title = deriveTitle(variables.content);
+        const preview = previewContent(variables.content);
         const otherNotes = old.filter((n) => n.id !== variables.id);
-        return [{ id: variables.id, title, updatedAt }, ...otherNotes];
+        return [{ id: variables.id, title, updatedAt, preview }, ...otherNotes];
       });
     },
     // OPTIMISTIC UPDATE END
@@ -197,7 +220,7 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
   const createNote = (id: string) => {
     queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
       if (old.some((n) => n.id === id)) return old;
-      return [{ id, title: "Untitled", updatedAt: Date.now() }, ...old];
+      return [{ id, title: "Untitled", updatedAt: Date.now(), preview: "" }, ...old];
     });
   };
 
@@ -222,6 +245,7 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
       // Also clean up local metadata
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(`noteMeta:${id}:updatedAt`);
+        window.localStorage.removeItem(`noteMeta:${id}:preview`);
       }
       await deleteNoteContent(id);
     } catch {
@@ -232,14 +256,16 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
   const updateLocalNoteFromContent = (id: string, content: string) => {
     const now = Date.now();
     const title = deriveTitle(content);
+    const preview = previewContent(content);
 
     queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
       const others = old.filter((n) => n.id !== id);
-      return [{ id, title, updatedAt: now }, ...others];
+      return [{ id, title, updatedAt: now, preview }, ...others];
     });
 
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(`noteMeta:${id}:updatedAt`, String(now));
+      window.localStorage.setItem(`noteMeta:${id}:preview`, preview);
     }
   };
 

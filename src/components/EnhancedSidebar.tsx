@@ -3,8 +3,6 @@ import type { Note } from "../types";
 import { Search } from "./Search";
 import { NoteItem } from "./NoteItem";
 import { ScrollArea } from "./ScrollArea";
-import { previewContent } from "../utils/preview";
-import { getDraftContent, getNoteContent } from "../utils/storage";
 
 interface EnhancedSidebarProps {
   notes: Note[];
@@ -34,7 +32,6 @@ export function EnhancedSidebar({
   const [isScrolled, setIsScrolled] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
-  const [previewsById, setPreviewsById] = useState<Map<string, string>>(new Map());
 
   const isSearching = searchQuery.trim().length > 0;
   const displayNotes = isSearching && searchResults ? searchResults : notes;
@@ -48,33 +45,6 @@ export function EnhancedSidebar({
       return b.updatedAt - a.updatedAt;
     });
   }, [displayNotes, pinnedIds]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const hydratePreviews = async () => {
-      const promises = notes.map(async (note) => {
-        const [draft, saved] = await Promise.all([
-          getDraftContent(note.id),
-          getNoteContent(note.id),
-        ]);
-        const content = draft ?? saved ?? "";
-        const preview = previewContent(content);
-        return { id: note.id, preview };
-      });
-      const results = await Promise.all(promises);
-      const next = new Map<string, string>();
-      for (const { id, preview } of results) {
-        next.set(id, preview);
-      }
-      if (!cancelled) {
-        setPreviewsById(next);
-      }
-    };
-    void hydratePreviews();
-    return () => {
-      cancelled = true;
-    };
-  }, [notes]);
 
   useEffect(() => {
     if (activeId && scrollViewportRef.current) {
@@ -229,7 +199,7 @@ export function EnhancedSidebar({
                   openSwipeItemId={openSwipeItemId}
                   setOpenSwipeItemId={setOpenSwipeItemId}
                   searchQuery={isSearching ? searchQuery : undefined}
-                  preview={previewsById.get(note.id) ?? ""}
+                  preview={note.preview ?? ""}
                 />
               ))}
             </ul>

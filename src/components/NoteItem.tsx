@@ -222,7 +222,8 @@ export const NoteItem = memo(function NoteItem({
     prevProps.isMobile === nextProps.isMobile &&
     prevProps.openSwipeItemId === nextProps.openSwipeItemId &&
     prevProps.searchQuery === nextProps.searchQuery &&
-    prevProps.pinnedIds.has(prevProps.note.id) === nextProps.pinnedIds.has(nextProps.note.id)
+    prevProps.pinnedIds.has(prevProps.note.id) === nextProps.pinnedIds.has(nextProps.note.id) &&
+    prevProps.preview === nextProps.preview
   );
 });
 

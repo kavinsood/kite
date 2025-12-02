@@ -1,9 +1,11 @@
 import { deriveTitle } from "../src/utils/title";
+import { previewContent } from "../src/utils/preview";
 
 interface NoteMetadata {
   title?: string;
   updatedAt?: number;
   deleted?: boolean;
+  preview?: string;
 }
 
 function getBucket(request: Request): string | null {
@@ -33,36 +35,50 @@ export default {
       if (url.pathname === "/api/notes" && request.method === "GET") {
         // No bucket means no server-backed notes
         if (!bucketId) {
-          return Response.json([]);
+          return Response.json({ notes: [], cursor: null });
         }
 
-        const cursorParam = url.searchParams.get("cursor") || undefined;
+        const initialCursor = url.searchParams.get("cursor") || undefined;
+        let cursor: string | undefined = initialCursor;
 
-        const list = await env.KV.list({
-          prefix: `${bucketId}:`,
-          cursor: cursorParam,
-          limit: 500,
-        });
+        while (true) {
+          const list = await env.KV.list({
+            prefix: `${bucketId}:`,
+            cursor,
+            limit: 500,
+          });
 
-        const notes: Array<{ id: string; title: string; updatedAt: number }> = [];
+          const notes: Array<{ id: string; title: string; updatedAt: number; preview?: string }> = [];
 
-        for (const key of list.keys) {
-          const metadata = (key.metadata || {}) as NoteMetadata;
-          if (!metadata.deleted) {
-            notes.push({
-              id: stripBucketPrefix(bucketId, key.name),
-              title: metadata.title || "Untitled",
-              updatedAt: metadata.updatedAt || 0,
+          for (const key of list.keys) {
+            const metadata = (key.metadata || {}) as NoteMetadata;
+            if (!metadata.deleted) {
+              notes.push({
+                id: stripBucketPrefix(bucketId, key.name),
+                title: metadata.title || "Untitled",
+                updatedAt: metadata.updatedAt || 0,
+                preview: metadata.preview,
+              });
+            }
+          }
+
+          if (notes.length > 0) {
+            notes.sort((a, b) => b.updatedAt - a.updatedAt);
+            return Response.json({
+              notes,
+              cursor: list.list_complete ? null : list.cursor,
             });
           }
+
+          if (list.list_complete) {
+            return Response.json({
+              notes: [],
+              cursor: null,
+            });
+          }
+
+          cursor = list.cursor;
         }
-
-        notes.sort((a, b) => b.updatedAt - a.updatedAt);
-
-        return Response.json({
-          notes,
-          cursor: list.list_complete ? null : list.cursor,
-        });
       }
 
       // All remaining API routes require a bucketId
@@ -114,6 +130,7 @@ export default {
         };
 
         const title = deriveTitle(content);
+        const preview = previewContent(content);
         const updatedAt = Date.now();
         const key = withBucketId(bucketId, id);
 
@@ -140,6 +157,7 @@ export default {
             title,
             updatedAt,
             deleted: existing.metadata?.deleted ?? false,
+            preview,
           },
         });
 
