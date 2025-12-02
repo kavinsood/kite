@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Note } from '../types';
 import { deriveTitle } from '../utils/title';
-import { getNoteContent, getDraftContent, deleteNoteContent, setNoteContent } from '../utils/storage';
+import { getNoteContent, getDraftContent, deleteNoteContent, setNoteContent, getAllKeys } from '../utils/storage';
 
 type UseNotesOptions = {
   bucketId: string | null;
@@ -13,9 +13,10 @@ async function getLocalNotes(): Promise<Note[]> {
 
   const notesById = new Map<string, { content: string; updatedAt: number }>();
 
-  for (let i = 0; i < window.localStorage.length; i++) {
-    const key = window.localStorage.key(i);
-    if (!key) continue;
+  const dbKeys = await getAllKeys();
+
+  for (const key of dbKeys) {
+    if (typeof key !== "string") continue;
 
     if (key.startsWith('note:')) {
       const id = key.slice('note:'.length);

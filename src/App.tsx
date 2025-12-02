@@ -12,7 +12,7 @@ import type { FullNote } from "./types";
 import { useDebouncedEffect } from "./hooks/useDebouncedEffect";
 import { generateBucketId } from "./utils/crypto";
 import { SearchIndexProvider, useSearchIndexContext } from "./hooks/SearchIndexContext";
-import { getDraftContent, getNoteContent, setDraftContent, setNoteContent, deleteDraftContent } from "./utils/storage";
+import { getDraftContent, getNoteContent, setDraftContent, setNoteContent, deleteDraftContent, getAllKeys } from "./utils/storage";
 
 const LAST_ACTIVE_KEY = "lastActiveNoteId";
 const draftKey = (id: string) => `draft:${id}`;
@@ -329,30 +329,32 @@ function App() {
     }
   };
 
-  const getLocalNotesWithContent = () => {
+  const getLocalNotesWithContent = async () => {
     if (typeof window === "undefined") return new Map<string, { content: string; updatedAt: number }>();
 
     const map = new Map<string, { content: string; updatedAt: number }>();
+    const dbKeys = await getAllKeys();
 
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (!key) continue;
+    for (const key of dbKeys) {
+      if (typeof key !== "string") continue;
 
       if (key.startsWith("note:")) {
         const id = key.slice("note:".length);
+        const content = (await getNoteContent(id)) ?? "";
         const updatedAt = Number(
           window.localStorage.getItem(`noteMeta:${id}:updatedAt`) ?? Date.now()
         );
-        map.set(id, { content: "", updatedAt });
+        map.set(id, { content, updatedAt });
       }
 
       if (key.startsWith("draft:")) {
         const id = key.slice("draft:".length);
+        const content = (await getDraftContent(id)) ?? "";
         const metaKey = `noteMeta:${id}:updatedAt`;
         const updatedAt = Number(window.localStorage.getItem(metaKey) ?? Date.now());
         const existing = map.get(id);
         if (!existing || updatedAt >= existing.updatedAt) {
-          map.set(id, { content: "", updatedAt });
+          map.set(id, { content, updatedAt });
         }
       }
     }
@@ -383,7 +385,7 @@ function App() {
         remoteMap.set(note.id, { updatedAt: note.updatedAt });
       }
 
-      const localMap = getLocalNotesWithContent();
+      const localMap = await getLocalNotesWithContent();
 
       const allIds = new Set<string>([
         ...Array.from(localMap.keys()),

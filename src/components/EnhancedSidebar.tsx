@@ -52,13 +52,19 @@ export function EnhancedSidebar({
   useEffect(() => {
     let cancelled = false;
     const hydratePreviews = async () => {
-      const next = new Map<string, string>();
-      for (const note of notes) {
-        const draft = await getDraftContent(note.id);
-        const saved = await getNoteContent(note.id);
+      const promises = notes.map(async (note) => {
+        const [draft, saved] = await Promise.all([
+          getDraftContent(note.id),
+          getNoteContent(note.id),
+        ]);
         const content = draft ?? saved ?? "";
         const preview = previewContent(content);
-        next.set(note.id, preview);
+        return { id: note.id, preview };
+      });
+      const results = await Promise.all(promises);
+      const next = new Map<string, string>();
+      for (const { id, preview } of results) {
+        next.set(id, preview);
       }
       if (!cancelled) {
         setPreviewsById(next);
