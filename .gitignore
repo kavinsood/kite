@@ -30,5 +30,3 @@ dist-ssr
 .env*
 !.env.example
 UI_COMPARISON_ANALYSIS.md
-.claude/*
-CLAUDE.md

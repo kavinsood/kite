@@ -1,8 +1,6 @@
 ## README
 
-### Overview
-
-This repo is a **minimal, zero-friction markdown scratchpad**:
+Kite is a minimal, zero-friction markdown scratchpad.
 
 - **No login, no landing page, no ads, no onboarding.**
 - You hit the URL and are **immediately in a markdown editor**.
@@ -411,13 +409,10 @@ pnpm run deploy
 
 ---
 
-## Design Philosophy (From the Conversation)
-
-Key intentional decisions made during this build:
+## Design Philosophy
 
 - **No login, no landing, no multi-user semantics**:
   - If you can open the URL, you are “logged in”.
-  - Auth is handled entirely by Cloudflare Access, not app code.
 
 - **Single, boring storage model**:
   - KV key = id, value = markdown, metadata = `{ title, updatedAt, deleted }`.
@@ -434,10 +429,6 @@ Key intentional decisions made during this build:
 - **Local drafts > network**:
   - On conflict, local drafts override server content.
   - Offline creation and save failures do not lose user text.
-
-- **Explicit pagination handling**:
-  - KV `list()` was initially naïvely called once.
-  - Now loops with `cursor` until `list_complete` to avoid truncating the sidebar at 1000 notes.
 
 - **Minimal coupling, acceptable duplication**:
   - Title derivation exists in both client (for instant UI) and server (for canonical metadata).
