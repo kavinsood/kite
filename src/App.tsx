@@ -385,7 +385,8 @@ function App() {
       if (!res.ok) {
         throw new Error("Failed to fetch remote notes");
       }
-      const remoteNotes = (await res.json()) as { id: string; title: string; updatedAt: number }[];
+      const data = (await res.json()) as { notes: { id: string; title: string; updatedAt: number }[]; cursor: string | null };
+      const remoteNotes = data.notes;
       const remoteMap = new Map<string, { updatedAt: number }>();
       for (const note of remoteNotes) {
         remoteMap.set(note.id, { updatedAt: note.updatedAt });
@@ -441,11 +442,15 @@ function App() {
 
         if (local && remote) {
           if (local.updatedAt >= remote.updatedAt) {
-            await safeSave(idOfNote, local.content);
+            // Skip if local content is empty - don't overwrite server with empty
+            if (local.content.trim().length > 0) {
+              await safeSave(idOfNote, local.content);
+            }
           } else {
             const full = await safeLoad(idOfNote);
             if (full) {
-              window.localStorage.setItem(`note:${idOfNote}`, full.content);
+              // Store in IndexedDB (not localStorage!)
+              await setNoteContent(idOfNote, full.content);
               window.localStorage.setItem(
                 `noteMeta:${idOfNote}:updatedAt`,
                 String(full.updatedAt)
@@ -453,11 +458,15 @@ function App() {
             }
           }
         } else if (local && !remote) {
-          await safeSave(idOfNote, local.content);
+          // Skip empty notes - don't upload ghost/empty notes to server
+          if (local.content.trim().length > 0) {
+            await safeSave(idOfNote, local.content);
+          }
         } else if (!local && remote) {
           const full = await safeLoad(idOfNote);
           if (full) {
-            window.localStorage.setItem(`note:${idOfNote}`, full.content);
+            // Store in IndexedDB (not localStorage!)
+            await setNoteContent(idOfNote, full.content);
             window.localStorage.setItem(
               `noteMeta:${idOfNote}:updatedAt`,
               String(full.updatedAt)

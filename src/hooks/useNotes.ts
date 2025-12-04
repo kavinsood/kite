@@ -83,7 +83,8 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
         return getLocalNotes();
       }
 
-      const all: Note[] = [];
+      // Fetch server notes
+      const serverNotes: Note[] = [];
       let cursor: string | null = null;
 
       do {
@@ -97,11 +98,32 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
           throw new Error(`Request failed: ${res.status}`);
         }
         const data = (await res.json()) as { notes: Note[]; cursor: string | null };
-        all.push(...data.notes);
+        serverNotes.push(...data.notes);
         cursor = data.cursor;
       } while (cursor);
 
-      return all;
+      // Fetch local notes (may include notes that failed to sync)
+      const localNotes = await getLocalNotes();
+
+      // Merge: server wins for existing notes, but include local-only notes
+      const serverMap = new Map<string, Note>();
+      for (const note of serverNotes) {
+        serverMap.set(note.id, note);
+      }
+
+      const merged: Note[] = [...serverNotes];
+
+      for (const localNote of localNotes) {
+        if (!serverMap.has(localNote.id)) {
+          // Local-only note (failed to sync or created offline)
+          merged.push(localNote);
+        }
+      }
+
+      // Sort by updatedAt descending
+      merged.sort((a, b) => b.updatedAt - a.updatedAt);
+
+      return merged;
     },
   });
 
@@ -227,7 +249,7 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
   const deleteNote = async (id: string): Promise<void> => {
     try {
       if (isSynced && bucketId) {
-        await fetch("/api/delete", {
+        const res = await fetch("/api/delete", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -235,6 +257,11 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
           },
           body: JSON.stringify({ id }),
         });
+
+        if (!res.ok) {
+          // Don't delete locally if server delete failed
+          return;
+        }
       }
 
       // Update React Query cache
@@ -256,14 +283,18 @@ export function useNotes({ bucketId, isSynced }: UseNotesOptions) {
   const updateLocalNoteFromContent = (id: string, content: string) => {
     // Only update title and preview for display purposes
     // Do NOT update updatedAt timestamp - that should only change when content is actually saved
+    // Also do NOT move the note position - keep it in place
     const title = deriveTitle(content);
     const preview = previewContent(content);
 
     queryClient.setQueryData<Note[]>(['notes', bucketId, isSynced], (old = []) => {
-      const existing = old.find((n) => n.id === id);
-      const updatedAt = existing?.updatedAt ?? Date.now(); // Preserve existing timestamp
-      const others = old.filter((n) => n.id !== id);
-      return [{ id, title, updatedAt, preview }, ...others];
+      // Update the note in place, preserving its position in the array
+      return old.map((n) => {
+        if (n.id === id) {
+          return { ...n, title, preview };
+        }
+        return n;
+      });
     });
 
     // Only update preview in localStorage, not the timestamp

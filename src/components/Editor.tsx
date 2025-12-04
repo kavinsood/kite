@@ -5,12 +5,24 @@ import { EditorView, Decoration, ViewPlugin, ViewUpdate, WidgetType } from "@cod
 import { RangeSetBuilder } from "@codemirror/state";
 import { keymap } from "@codemirror/view";
 import { indentSelection, indentLess } from "@codemirror/commands";
-import { indentUnit, syntaxTree } from "@codemirror/language";
+import { indentUnit, syntaxTree, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 
 interface EditorProps {
   content: string;
   onChange: (val: string) => void;
 }
+
+// Override the default highlight style to remove underlines from headings
+const customHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading, textDecoration: "none", fontWeight: "bold" },
+  { tag: tags.heading1, textDecoration: "none", fontWeight: "bold" },
+  { tag: tags.heading2, textDecoration: "none", fontWeight: "bold" },
+  { tag: tags.heading3, textDecoration: "none", fontWeight: "bold" },
+  { tag: tags.heading4, textDecoration: "none", fontWeight: "bold" },
+  { tag: tags.heading5, textDecoration: "none", fontWeight: "bold" },
+  { tag: tags.heading6, textDecoration: "none", fontWeight: "bold" },
+]);
 
 const editorTheme = EditorView.theme({
   "&": {
@@ -409,6 +421,7 @@ export function Editor({ content, onChange }: EditorProps) {
           markdown(),
           indentUnit.of("  "),
           editorTheme,
+          syntaxHighlighting(customHighlightStyle),
           taskListPlugin,
           markdownRenderPlugin,
           preventCommentKeymap,

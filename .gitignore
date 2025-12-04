@@ -29,5 +29,6 @@ dist-ssr
 !.dev.vars.example
 .env*
 !.env.example
-alanagoyal-main/
 UI_COMPARISON_ANALYSIS.md
+.claude/*
+CLAUDE.md
