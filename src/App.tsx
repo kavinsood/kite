@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, Suspense, lazy } from "react";
+import { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import { SidebarLayout } from "./components/SidebarLayout";
 import { CommandPalette } from "./components/CommandPalette";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -8,17 +8,13 @@ import { useMobileKeyboard } from "./hooks/useMobileKeyboard";
 import { useNotes } from "./hooks/useNotes";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { Icons } from "./components/Icons";
-import type { FullNote } from "./types";
 import { useDebouncedEffect } from "./hooks/useDebouncedEffect";
-import { generateBucketId } from "./utils/crypto";
 import { SearchIndexProvider, useSearchIndexContext } from "./hooks/SearchIndexContext";
-import { getDraftContent, getNoteContent, setDraftContent, setNoteContent, deleteDraftContent, getAllKeys } from "./utils/storage";
+import { getDraftContent, getNoteContent, setDraftContent, setNoteContent, deleteDraftContent } from "./utils/storage";
 
 const LAST_ACTIVE_KEY = "lastActiveNoteId";
 const draftKey = (id: string) => `draft:${id}`;
 const PINNED_KEY = "pinnedNotes";
-const BUCKET_ID_KEY = "kite_bucket_id";
-const IS_SYNCED_KEY = "kite_is_synced";
 
 const LazyEditor = lazy(async () => {
   const mod = await import("./components/Editor");
@@ -47,15 +43,6 @@ function App() {
   const [isPersisted, setIsPersisted] = useState(false);
   const [recovered, setRecovered] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [bucketId, setBucketId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    const stored = window.localStorage.getItem(BUCKET_ID_KEY);
-    return stored && stored.trim().length > 0 ? stored : null;
-  });
-  const [isSynced, setIsSynced] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(IS_SYNCED_KEY) === "true";
-  });
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -71,9 +58,14 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const isMobile = useMobileDetect();
   const [showSidebar, setShowSidebar] = useState(true);
-  const isSyncInProgressRef = useRef(false);
 
   useMobileKeyboard();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem("kite_bucket_id");
+    window.localStorage.removeItem("kite_is_synced");
+  }, []);
 
   const {
     notes,
@@ -83,12 +75,8 @@ function App() {
     createNote,
     deleteNote,
     saveMutation,
-    refetchNotes,
     updateLocalNoteFromContent,
-  } = useNotes({
-    bucketId,
-    isSynced,
-  });
+  } = useNotes();
   useEffect(() => {
     if (isError) {
       setLoadError("Failed to load notes");
@@ -129,16 +117,6 @@ function App() {
     window.localStorage.setItem(PINNED_KEY, JSON.stringify(Array.from(pinnedIds)));
   }, [pinnedIds]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (bucketId) {
-      window.localStorage.setItem(BUCKET_ID_KEY, bucketId);
-    } else {
-      window.localStorage.removeItem(BUCKET_ID_KEY);
-    }
-    window.localStorage.setItem(IS_SYNCED_KEY, isSynced ? "true" : "false");
-  }, [bucketId, isSynced]);
-
   const orderedNotes = useMemo(() => {
     const pinned = notes.filter((note) => pinnedIds.has(note.id));
     const others = notes.filter((note) => !pinnedIds.has(note.id));
@@ -166,71 +144,20 @@ function App() {
 
     const loadLocal = async () => {
       localDraft = (await getDraftContent(activeId)) ?? undefined;
-      if (!isSynced || !bucketId) {
-        if (localDraft !== undefined) {
-          if (!ignore) {
-            setContent(localDraft);
-            setLastSavedContent(localDraft);
-            setIsPersisted(true);
-          }
-        } else {
-          const localContent = (await getNoteContent(activeId)) ?? "";
-          if (!ignore) {
-            setContent(localContent);
-            setLastSavedContent(localContent);
-            setIsPersisted(localContent.length > 0);
-          }
-        }
-        return;
-      }
-
-      void fetch(`/api/note/${activeId}`, {
-      headers: bucketId ? { "X-Bucket-Id": bucketId } : undefined,
-    })
-      .then(async (res) => {
-        if (res.status === 404) {
-          if (localDraft !== undefined) {
-            if (!ignore) {
-              setContent(localDraft);
-            }
-          } else {
-            if (!ignore) {
-              setContent("");
-            }
-          }
-          setIsPersisted(false);
-          return;
-        }
-        if (!res.ok) {
-          throw new Error("Failed to load note");
-        }
-        const data = (await res.json()) as FullNote;
-        if (localDraft !== undefined && localDraft !== data.content) {
-          if (!ignore) {
-            setContent(localDraft);
-            setRecovered(true);
-            setIsPersisted(true);
-            setLastSavedContent(data.content);
-            void setNoteContent(activeId, data.content);
-          }
-        } else {
-          if (!ignore) {
-            setContent(data.content);
-            setLastSavedContent(data.content);
-            setIsPersisted(true);
-            void setNoteContent(activeId, data.content);
-          }
-        }
-      })
-      .catch(() => {
-        if (ignore) return;
-        if (localDraft !== undefined) {
+      if (localDraft !== undefined) {
+        if (!ignore) {
           setContent(localDraft);
-        } else {
-          setContent("");
+          setLastSavedContent(localDraft);
+          setIsPersisted(true);
         }
-        setIsPersisted(false);
-      });
+      } else {
+        const localContent = (await getNoteContent(activeId)) ?? "";
+        if (!ignore) {
+          setContent(localContent);
+          setLastSavedContent(localContent);
+          setIsPersisted(localContent.length > 0);
+        }
+      }
     };
 
     void loadLocal();
@@ -238,7 +165,7 @@ function App() {
     return () => {
       ignore = true;
     };
-  }, [activeId, bucketId, isSynced]);
+  }, [activeId]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -335,172 +262,7 @@ function App() {
     }
   };
 
-  const getLocalNotesWithContent = async () => {
-    if (typeof window === "undefined") return new Map<string, { content: string; updatedAt: number }>();
 
-    const map = new Map<string, { content: string; updatedAt: number }>();
-    const dbKeys = await getAllKeys();
-
-    for (const key of dbKeys) {
-      if (typeof key !== "string") continue;
-
-      if (key.startsWith("note:")) {
-        const id = key.slice("note:".length);
-        const content = (await getNoteContent(id)) ?? "";
-        const updatedAt = Number(
-          window.localStorage.getItem(`noteMeta:${id}:updatedAt`) ?? Date.now()
-        );
-        map.set(id, { content, updatedAt });
-      }
-
-      if (key.startsWith("draft:")) {
-        const id = key.slice("draft:".length);
-        const content = (await getDraftContent(id)) ?? "";
-        const metaKey = `noteMeta:${id}:updatedAt`;
-        const updatedAt = Number(window.localStorage.getItem(metaKey) ?? Date.now());
-        const existing = map.get(id);
-        if (!existing || updatedAt >= existing.updatedAt) {
-          map.set(id, { content, updatedAt });
-        }
-      }
-    }
-
-    return map;
-  };
-
-  const handleSync = async (passphrase: string) => {
-    if (typeof window === "undefined") return;
-    if (isSyncInProgressRef.current) return;
-    const trimmed = passphrase.trim();
-    if (!trimmed) return;
-
-    isSyncInProgressRef.current = true;
-    try {
-      const id = await generateBucketId(trimmed);
-      const res = await fetch("/api/notes", {
-        headers: {
-          "X-Bucket-Id": id,
-        },
-      });
-      if (!res.ok) {
-        throw new Error("Failed to fetch remote notes");
-      }
-      const data = (await res.json()) as { notes: { id: string; title: string; updatedAt: number }[]; cursor: string | null };
-      const remoteNotes = data.notes;
-      const remoteMap = new Map<string, { updatedAt: number }>();
-      for (const note of remoteNotes) {
-        remoteMap.set(note.id, { updatedAt: note.updatedAt });
-      }
-
-      const localMap = await getLocalNotesWithContent();
-
-      const allIds = new Set<string>([
-        ...Array.from(localMap.keys()),
-        ...Array.from(remoteMap.keys()),
-      ]);
-
-      let hadSyncError = false;
-
-      const safeSave = async (noteId: string, content: string) => {
-        try {
-          const saveRes = await fetch("/api/save", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Bucket-Id": id,
-            },
-            body: JSON.stringify({ id: noteId, content }),
-          });
-          if (!saveRes.ok) {
-            hadSyncError = true;
-          }
-        } catch {
-          hadSyncError = true;
-        }
-      };
-
-      const safeLoad = async (noteId: string) => {
-        try {
-          const noteRes = await fetch(`/api/note/${noteId}`, {
-            headers: { "X-Bucket-Id": id },
-          });
-          if (!noteRes.ok) {
-            hadSyncError = true;
-            return null;
-          }
-          const full = (await noteRes.json()) as FullNote;
-          return full;
-        } catch {
-          hadSyncError = true;
-          return null;
-        }
-      };
-
-      for (const idOfNote of allIds) {
-        const local = localMap.get(idOfNote);
-        const remote = remoteMap.get(idOfNote);
-
-        if (local && remote) {
-          if (local.updatedAt >= remote.updatedAt) {
-            // Skip if local content is empty - don't overwrite server with empty
-            if (local.content.trim().length > 0) {
-              await safeSave(idOfNote, local.content);
-            }
-          } else {
-            const full = await safeLoad(idOfNote);
-            if (full) {
-              // Store in IndexedDB (not localStorage!)
-              await setNoteContent(idOfNote, full.content);
-              window.localStorage.setItem(
-                `noteMeta:${idOfNote}:updatedAt`,
-                String(full.updatedAt)
-              );
-            }
-          }
-        } else if (local && !remote) {
-          // Skip empty notes - don't upload ghost/empty notes to server
-          if (local.content.trim().length > 0) {
-            await safeSave(idOfNote, local.content);
-          }
-        } else if (!local && remote) {
-          const full = await safeLoad(idOfNote);
-          if (full) {
-            // Store in IndexedDB (not localStorage!)
-            await setNoteContent(idOfNote, full.content);
-            window.localStorage.setItem(
-              `noteMeta:${idOfNote}:updatedAt`,
-              String(full.updatedAt)
-            );
-          }
-        }
-      }
-
-      if (!hadSyncError) {
-        setBucketId(id);
-        setIsSynced(true);
-        window.localStorage.setItem(BUCKET_ID_KEY, id);
-        window.localStorage.setItem(IS_SYNCED_KEY, "true");
-        void refetchNotes();
-      }
-    } catch {
-      setIsSynced(false);
-      window.localStorage.setItem(IS_SYNCED_KEY, "false");
-    } finally {
-      isSyncInProgressRef.current = false;
-    }
-  };
-
-  const handleDisableSync = () => {
-    // Disable sync but preserve all local notes
-    // Notes are stored in localStorage with keys like "note:${id}" and "noteMeta:${id}:updatedAt"
-    // which are NOT touched here - only the sync configuration is cleared
-    setBucketId(null);
-    setIsSynced(false);
-    window.localStorage.removeItem(BUCKET_ID_KEY);
-    window.localStorage.setItem(IS_SYNCED_KEY, "false");
-    // Refetch will call getLocalNotes() which reads from localStorage, preserving all notes
-    void refetchNotes();
-  };
 
   useShortcuts({
     activeId,
@@ -660,9 +422,6 @@ function App() {
         onDelete={handleDelete}
         onTogglePin={handleTogglePin}
         onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
-        onSync={handleSync}
-        isSynced={isSynced}
-        onDisableSync={handleDisableSync}
       />
       <SearchIndexSync activeId={activeId} content={content} />
     </SidebarLayout>

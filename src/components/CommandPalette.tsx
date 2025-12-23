@@ -15,9 +15,6 @@ interface CommandPaletteProps {
   onDelete: () => void;
   onTogglePin: (id: string) => void;
   onToggleSidebar?: () => void;
-  onSync?: (passphrase: string) => void;
-  isSynced?: boolean;
-  onDisableSync?: () => void;
 }
 
 interface CommandItem {
@@ -40,21 +37,16 @@ export function CommandPalette({
   onDelete,
   onTogglePin,
   onToggleSidebar,
-  onSync,
-  isSynced = false,
-  onDisableSync,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const [isSyncMode, setIsSyncMode] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const { setTheme, resolvedTheme } = useTheme();
   const { searchWithPositions } = useSearchIndexContext();
-
+  
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
       setHighlightedIndex(0);
-      setIsSyncMode(false);
     }
   }, [isOpen]);
 
@@ -96,42 +88,11 @@ export function CommandPalette({
       },
     ];
 
-    if (onSync && !isSynced) {
-      items.push({
-        id: "sync",
-        label: isSyncMode ? "Enter passphrase" : "Enable sync",
-        description: isSyncMode
-          ? "Type your passphrase above and press Enter"
-          : "Enter a passphrase to sync notes across devices",
-        icon: <Command className="h-4 w-4" />,
-        shortcut: "S",
-        run: () => {
-          setIsSyncMode(true);
-          setQuery("");
-          setHighlightedIndex(0);
-        },
-      });
-    }
-
-    if (isSynced && onDisableSync) {
-      items.push({
-        id: "disable-sync",
-        label: "Disable sync",
-        description: "Stop syncing and use local storage only",
-        icon: <Command className="h-4 w-4" />,
-        shortcut: "S",
-        run: () => {
-          onDisableSync();
-          onClose();
-        },
-      });
-    }
-
     if (onToggleSidebar) {
       items.push({
         id: "toggle-sidebar",
         label: "Toggle sidebar",
-        description: "Show or hide the sidebar",
+        description: "Show or hide sidebar",
         icon: <Command className="h-4 w-4" />,
         shortcut: "Ctrl+/",
         run: onToggleSidebar,
@@ -147,7 +108,7 @@ export function CommandPalette({
         items.push({
           id: "move-down",
           label: "Move to next note",
-          description: "Navigate to the next note",
+          description: "Navigate to next note",
           icon: <ArrowDown className="h-4 w-4" />,
           shortcut: "J",
           run: () => {
@@ -162,7 +123,7 @@ export function CommandPalette({
         items.push({
           id: "move-up",
           label: "Move to previous note",
-          description: "Navigate to the previous note",
+          description: "Navigate to previous note",
           icon: <ArrowUp className="h-4 w-4" />,
           shortcut: "K",
           run: () => {
@@ -199,7 +160,7 @@ export function CommandPalette({
         {
           id: "copy-link",
           label: "Copy link to current note",
-          description: "Copy the URL of this note to clipboard",
+          description: "Copy URL of this note to clipboard",
           icon: <Link className="h-4 w-4" />,
           run: () => {
             const url = `${window.location.origin}/n/${activeId}`;
@@ -211,7 +172,7 @@ export function CommandPalette({
     }
 
     return items;
-  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme, onSync, isSyncMode, isSynced, onDisableSync]);
+  }, [activeId, onCreate, onDelete, onTogglePin, pinnedIds, orderedNotes, onSelectNote, onToggleSidebar, resolvedTheme, setTheme]);
 
   const filteredCommands = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -243,33 +204,6 @@ export function CommandPalette({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    // In sync mode, only handle Enter and Escape
-    if (isSyncMode) {
-      if (event.key === "Enter" && onSync) {
-        event.preventDefault();
-        const passphrase = query.trim();
-        if (passphrase) {
-          onSync(passphrase);
-          onClose();
-          setIsSyncMode(false);
-          setQuery("");
-          setHighlightedIndex(0);
-        }
-        return;
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setIsSyncMode(false);
-        setQuery("");
-        setHighlightedIndex(0);
-        return;
-      }
-      // Allow all other keys to be typed normally in sync mode
-      return;
-    }
-
-    // Normal command palette mode - no shortcut matching while typing
-    // Only handle navigation and selection keys
     const inputValue = (event.currentTarget as HTMLInputElement).value;
     const hasSearchText = inputValue.trim().length > 0;
     
@@ -300,25 +234,20 @@ export function CommandPalette({
             <Command className="h-4 w-4 text-muted-foreground" />
             <input
               autoFocus
-              type={isSyncMode ? "password" : "text"}
+              type="text"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
                 setHighlightedIndex(0);
               }}
               onKeyDown={handleKeyDown}
-              placeholder={isSyncMode ? "Enter passphrase and press Enter…" : "Type a command or search notes…"}
+              placeholder="Type a command or search notes…"
               className="flex-1 bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none border-none focus:outline-none focus:ring-0"
             />
           </div>
         </div>
         <div className="max-h-96 overflow-y-auto py-2">
-          {isSyncMode ? (
-            <div className="px-4 py-8 text-center">
-              <p className="text-sm text-muted-foreground">Enter your sync passphrase</p>
-              <p className="mt-1 text-xs text-muted-foreground/70">Press Enter to sync or Escape to cancel</p>
-            </div>
-          ) : items.length === 0 ? (
+          {items.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <p className="text-sm text-muted-foreground">No results found</p>
               <p className="mt-1 text-xs text-muted-foreground/70">Try a different search term</p>
@@ -392,7 +321,7 @@ export function CommandPalette({
                             </div>
                           )}
                          </>
-                       ) : null}
+                        ) : null}
                     </button>
                   </li>
                 );

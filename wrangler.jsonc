@@ -11,11 +11,5 @@
 	"observability": {
 		"enabled": true
 	},
-	"placement": { "mode": "smart" },
-	"kv_namespaces": [
-  	{
-      "binding": "KV",
-      "id": "ce8ee0535fa44d98a251837cafbf5b2f"
-    }
-  ]
+	"placement": { "mode": "smart" }
 }
