@@ -32,7 +32,7 @@ export function useShortcuts({
         (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
 
       const isSidebarToggleShortcut =
-        (event.metaKey || event.ctrlKey) && event.key === "/";
+        (event.metaKey || event.ctrlKey) && event.key === ".";
 
       if (isSidebarToggleShortcut) {
         event.preventDefault();

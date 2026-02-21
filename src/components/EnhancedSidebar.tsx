@@ -206,6 +206,13 @@ export function EnhancedSidebar({
           )}
         </div>
       </ScrollArea>
+      <div className="border-t border-muted-foreground/10 px-4 py-2">
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground/50">
+          <kbd className="rounded border border-muted-foreground/15 px-1 py-0.5 font-mono text-[10px] leading-none">Ctrl</kbd>
+          <kbd className="rounded border border-muted-foreground/15 px-1 py-0.5 font-mono text-[10px] leading-none">K</kbd>
+          <span>commands</span>
+        </div>
+      </div>
     </div>
   );
 }

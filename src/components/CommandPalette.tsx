@@ -94,7 +94,7 @@ export function CommandPalette({
         label: "Toggle sidebar",
         description: "Show or hide sidebar",
         icon: <Command className="h-4 w-4" />,
-        shortcut: "Ctrl+/",
+        shortcut: "Ctrl+.",
         run: onToggleSidebar,
       });
     }
