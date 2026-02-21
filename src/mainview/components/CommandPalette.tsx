@@ -94,7 +94,7 @@ export function CommandPalette({
         label: "Toggle sidebar",
         description: "Show or hide sidebar",
         icon: <Command className="h-4 w-4" />,
-        shortcut: "Ctrl+/",
+        shortcut: "Ctrl+.",
         run: onToggleSidebar,
       });
     }
@@ -184,10 +184,19 @@ export function CommandPalette({
     );
   }, [commands, query]);
 
-  const noteResults = useMemo(() => {
+  const [noteResults, setNoteResults] = useState<Note[]>([]);
+
+  useEffect(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return [];
-    return searchWithPositions(q, notes);
+    if (!q) {
+      setNoteResults([]);
+      return;
+    }
+    let cancelled = false;
+    void searchWithPositions(q, notes).then((results) => {
+      if (!cancelled) setNoteResults(results);
+    });
+    return () => { cancelled = true; };
   }, [notes, query, searchWithPositions]);
 
   const items = [...filteredCommands, ...noteResults];

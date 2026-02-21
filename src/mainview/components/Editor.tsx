@@ -365,13 +365,6 @@ const taskListPlugin = ViewPlugin.fromClass(
   },
 );
 
-const preventCommentKeymap = keymap.of([
-  {
-    key: "Mod-/",
-    run: () => false,
-  },
-]);
-
 const tabIndent = keymap.of([
   {
     key: "Tab",
@@ -424,7 +417,6 @@ export function Editor({ content, onChange }: EditorProps) {
           syntaxHighlighting(customHighlightStyle),
           taskListPlugin,
           markdownRenderPlugin,
-          preventCommentKeymap,
           tabIndent,
           EditorView.lineWrapping,
         ]}

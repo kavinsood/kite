@@ -8,12 +8,7 @@
 			"path": "./tsconfig.node.json"
 		},
 		{
-			"path": "./tsconfig.worker.json"
+			"path": "./tsconfig.bun.json"
 		}
-	],
-	"compilerOptions": {
-		"types": [
-			"./worker-configuration.d.ts"
-		]
-	}
+	]
 }

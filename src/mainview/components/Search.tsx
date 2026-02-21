@@ -32,11 +32,15 @@ export function Search({
       return;
     }
 
-    // Use in-memory search index - no localStorage I/O in hot loop
-    const results = search(q, notes);
+    let cancelled = false;
+    void search(q, notes).then((results) => {
+      if (!cancelled) {
+        onSearchResults(results);
+        setHighlightedIndex(0);
+      }
+    });
 
-    onSearchResults(results);
-    setHighlightedIndex(0);
+    return () => { cancelled = true; };
   }, [searchQuery, notes, onSearchResults, setHighlightedIndex, search]);
 
   return (

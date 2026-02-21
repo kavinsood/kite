@@ -2,12 +2,12 @@ import type { Config } from "tailwindcss";
 const { fontFamily } = require("tailwindcss/defaultTheme");
 
 const config: Config = {
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  content: ["./src/mainview/**/*.{html,js,ts,jsx,tsx}"],
   darkMode: ["class"],
   theme: {
     extend: {
       fontFamily: {
-        sans: ["-apple-system", "SF Pro", "SF Pro Display", "SF Pro Text", ...fontFamily.sans],
+        sans: ["Inter", "system-ui", ...fontFamily.sans],
       },
       colors: {
         border: "hsl(var(--border))",

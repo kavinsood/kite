@@ -9,11 +9,11 @@ import { useNotes } from "./hooks/useNotes";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { Icons } from "./components/Icons";
 import { useDebouncedEffect } from "./hooks/useDebouncedEffect";
+import { useZoom } from "./hooks/useZoom";
 import { SearchIndexProvider, useSearchIndexContext } from "./hooks/SearchIndexContext";
 import { getDraftContent, getNoteContent, setDraftContent, setNoteContent, deleteDraftContent } from "./utils/storage";
 
 const LAST_ACTIVE_KEY = "lastActiveNoteId";
-const draftKey = (id: string) => `draft:${id}`;
 const PINNED_KEY = "pinnedNotes";
 
 const LazyEditor = lazy(async () => {
@@ -60,12 +60,7 @@ function App() {
   const [showSidebar, setShowSidebar] = useState(true);
 
   useMobileKeyboard();
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem("kite_bucket_id");
-    window.localStorage.removeItem("kite_is_synced");
-  }, []);
+  useZoom();
 
   const {
     notes,
@@ -167,10 +162,14 @@ function App() {
     };
   }, [activeId]);
 
-  useEffect(() => {
-    if (!activeId) return;
-    void setDraftContent(activeId, content);
-  }, [activeId, content]);
+  useDebouncedEffect(
+    () => {
+      if (!activeId) return;
+      void setDraftContent(activeId, content);
+    },
+    300,
+    [activeId, content],
+  );
 
   const handleTogglePin = (id: string) => {
     setPinnedIds((prev) => {
@@ -244,7 +243,6 @@ function App() {
     if (!idToDelete) return;
 
     await deleteNote(idToDelete);
-    localStorage.removeItem(draftKey(idToDelete));
 
     const remaining = orderedNotes.filter((n) => n.id !== idToDelete);
     if (remaining.length > 0) {
