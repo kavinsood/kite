@@ -41,9 +41,7 @@ export function SidebarLayout({
 
   return (
     <div className="flex h-screen bg-background text-foreground">
-      <div
-        className={`${showSidebar ? "" : "hidden"}`}
-      >
+      <div className={`${showSidebar ? "" : "hidden"}`}>
         <EnhancedSidebar
           notes={notes}
           activeId={activeId}
@@ -61,4 +59,3 @@ export function SidebarLayout({
     </div>
   );
 }
-
